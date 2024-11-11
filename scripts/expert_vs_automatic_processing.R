@@ -1,14 +1,18 @@
 # ---
 # Authors: Camille Minaudo
 # Project: "RESTORE4Cs"
-# date: "Oct 2023"
-# https://github.com/camilleminaudo/restore4cs-scripts
+# date: "Oct 2024"
+# https://github.com/camilleminaudo/ghg-flux-expert
 # ---
 
 # --- Description of this script
-# This script lists all incubations corresponding to a suite of criterias and create a single RData file out of it
-# This data will later be used for automatic versus expert flux assessment.
+# This script loads a selection of randomly chosen incubations and asks the expert 
+# to manually select what looks like safe data to calculate CO2 flux. 
+# For CH4, experts are asked to manually select what looks to them like diffusion 
+# only (or no ebullition).
 
+
+# clearing workspace and console
 rm(list = ls()) # clear workspace
 cat("/014") # clear console
 
@@ -27,7 +31,7 @@ username <- "Camille"
 dropbox_root <- "C:/Users/Camille Minaudo/Dropbox/RESTORE4Cs - Fieldwork/Data" 
 
 #---------------------------------------------------------#
-nb_draw <- 2
+nb_draw <- 10
 
 # ---- packages ----
 library(tidyverse)
