@@ -25,13 +25,14 @@ cat("/014") # clear console
 ############### ------- SETTINGS ------- ##################
 
 # SPECIFY HERE YOUR NAME
-username <- "Camille"
+username <- "X"
 
 # You have to make sure this is pointing to the write folder on your local machine
 dropbox_root <- "C:/Users/Camille Minaudo/Dropbox/RESTORE4Cs - Fieldwork/Data" 
 
 #---------------------------------------------------------#
-nb_draw <- 10
+# set the number of incubations you want to work on in this session.
+nb_draw <- 10 # change this as you please, but not below 2. A value of 10 is a good compromise.
 
 # ---- packages ----
 library(tidyverse)
@@ -103,6 +104,12 @@ if(length(areleft)>=round(nb_draw/2)){
 # if not, incubations are chosen randomly among the whole dataset
   draw <- sample(x, nb_draw)
 }
+
+
+if(username =="X"){
+  stop("Please provide your username")
+}
+
 
 table_draw <- data.frame(username = username,
                          draw = draw,
