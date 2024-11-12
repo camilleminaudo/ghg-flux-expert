@@ -139,15 +139,18 @@ click.peak <- function(flux.unique, gastype, sleep = 3,
     ifelse(. < plot.lim[1], plot.lim[1], .)
 
   # Open plot in a new window to avoid problems with the identify function
-  dev.new(noRStudioGD = TRUE, width = 14, height = 8)
+  dev.new(noRStudioGD = TRUE, width = 8, height = 8)
   mytitle <- ""
+  mycol="black"
   if(gastype=="CO2dry_ppm"){
     mytitle <- "Select what looks like safe CO2 data..."
+    mycol <- "blue"
   } else {
     mytitle <- "Select what looks like CH4 diffusion..."
+    mycol = "red"
   }
   # Plot individual measurements
-  plot(flux.meas ~ time.meas,
+  plot(flux.meas ~ time.meas, col = mycol,
        main = mytitle,
        xlab = "Time", ylab = gastype, xaxt = 'n',
        ylim = c(yaxis.limit.min, yaxis.limit.max))
@@ -184,7 +187,7 @@ click.peak <- function(flux.unique, gastype, sleep = 3,
            cf = cf)
 
   # Inspect the full data set to see if it looks OK
-  dev.new(noRStudioGD = TRUE, width = 14, height = 8)
+  dev.new(noRStudioGD = TRUE, width = 8, height = 8)
   mytitle <- ""
   if(gastype=="CO2dry_ppm"){
     mytitle <- "Your selection for safe CO2 data"
