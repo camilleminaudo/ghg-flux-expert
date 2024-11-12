@@ -17,11 +17,6 @@ rm(list = ls()) # clear workspace
 cat("/014") # clear console
 
 
-# --- install goFlux if needed ---
-# library(devtools)
-# install_github("Qepanna/goFlux")
-
-
 ############### ------- SETTINGS ------- ##################
 
 # SPECIFY HERE YOUR NAME
@@ -41,12 +36,19 @@ library(zoo)
 library(ggplot2)
 library(egg)
 library(goFlux)
-require(dplyr)
-require(purrr)
-require(msm)
-require(data.table)
-require(tools)
-require(pbapply)
+library(dplyr)
+library(purrr)
+library(msm)
+library(data.table)
+library(tools)
+library(pbapply)
+library(ipify)
+
+
+# --- install goFlux if needed ---
+library(devtools)
+# install_github("Qepanna/goFlux")
+# install_github("gregce/ipify")
 
 repo_root <- dirname(dirname(rstudioapi::getSourceEditorContext()$path))
 files.sources = list.files(path = paste0(repo_root,"/functions"), full.names = T)
@@ -112,6 +114,7 @@ if(username =="X"){
 
 
 table_draw <- data.frame(username = username,
+                         IP = as.character(get_ip()),
                          draw = draw,
                          subsite = auxfile$subsite[draw],
                          UniqueID = auxfile$UniqueID[draw])
