@@ -41,7 +41,7 @@ pre-installed packages.
 
 # Run the scripts
 When ready, open scripts/expert_vs_automatic_processing.R
-Enter your username and the correct path to the Dropbox folder.
+Enter your username (Firstname + Lastname) and the correct path to the Dropbox folder.
 You can also change the number of incubation timeseries you want to work on in this session. I recommend to keep nb_draw at a value of 10.
 Then run the script.
 

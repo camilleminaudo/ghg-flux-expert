@@ -19,10 +19,11 @@ cat("/014") # clear console
 
 ############### ------- SETTINGS ------- ##################
 
-# SPECIFY HERE YOUR NAME
+# SPECIFY HERE YOUR NAME (Firstname + Lastname)
 username <- "X"
 
-# You have to make sure this is pointing to the write folder on your local machine
+# You have to make sure this is pointing to the "RESTORE4Cs - Fieldwork/Data" folder on your local machine
+# For instance, for me it is: "C:/Users/Camille Minaudo/Dropbox/RESTORE4Cs - Fieldwork/Data" 
 dropbox_root <- "C:/Users/Camille Minaudo/Dropbox/RESTORE4Cs - Fieldwork/Data" 
 
 #---------------------------------------------------------#
