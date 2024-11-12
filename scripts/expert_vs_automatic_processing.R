@@ -42,7 +42,6 @@ library(msm)
 library(data.table)
 library(tools)
 library(pbapply)
-library(ipify)
 
 
 # --- install goFlux if needed ---
@@ -114,7 +113,6 @@ if(username =="X"){
 
 
 table_draw <- data.frame(username = username,
-                         IP = as.character(get_ip()),
                          draw = draw,
                          subsite = auxfile$subsite[draw],
                          UniqueID = auxfile$UniqueID[draw])
