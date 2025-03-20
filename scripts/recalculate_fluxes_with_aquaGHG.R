@@ -141,11 +141,10 @@ table_ebull$uniqAssessID <- table_draw_fixed$uniqAssessID[match(paste0(table_ebu
 
 # ---- Re-compute fluxes ----
 
-load_incubation <- function(id, auxfile, RData_path){
-  k <- which(auxfile$UniqueID==id)
+load_incubation <- function(auxfile, RData_path){
   
-  message("Loading data for ",auxfile$UniqueID[k])
-  gas <- unique(auxfile$gas_analiser[k])
+  message("Loading data for ",auxfile$UniqueID)
+  gas <- unique(auxfile$gas_analiser)
   
   setwd(RData_path)
   if(gas== "LI-COR"){
@@ -153,15 +152,15 @@ load_incubation <- function(id, auxfile, RData_path){
   } else {
     gs_suffix <- gas
   }
-  load(file = paste0(auxfile$subsite[k],"_",gs_suffix,".RData"))
+  load(file = paste0(auxfile$subsite,"_",gs_suffix,".RData"))
   mydata <- mydata[,c("POSIX.time", 
                       "CO2dry_ppm", "CH4dry_ppb", "H2O_ppm",
                       "CO2_prec",   "CH4_prec",   "H2O_prec"  )]
   
-  mydata <- mydata[which(mydata$POSIX.time>=auxfile$start.time[k] & 
-                           mydata$POSIX.time<=auxfile$start.time[k]+auxfile$duration[k]),]
+  mydata <- mydata[which(mydata$POSIX.time>=auxfile$start.time & 
+                           mydata$POSIX.time<=auxfile$start.time+auxfile$duration),]
   mydata$Etime <- as.numeric(mydata$POSIX.time) - min(as.numeric(mydata$POSIX.time))
-  mydata$UniqueID <- auxfile$UniqueID[k]
+  mydata$UniqueID <- auxfile$UniqueID
   
   return(mydata)
 }
@@ -177,7 +176,7 @@ for (i in unique(table_draws$UniqueID)){
   if(dim(auxfile_i)[1]==0){
     message(paste0("Could not find corresponding auxfile for ",i))
   } else {
-    mydata <- load_incubation(id = i, auxfile_i, RData_path)
+    mydata <- load_incubation(auxfile_i, RData_path)
     
     # calculate flux with aquaGHG, no manual selection
     message("... calculate CO2 flux with aquaGHG, no manual selection")
@@ -233,6 +232,7 @@ for (i in unique(table_draws$UniqueID)){
         CH4_diff_flux.man_j$uniqAssessID <- j
         CH4_diff_flux.man <- rbind(CH4_diff_flux.man, CH4_diff_flux.man_j)
       }
+      rm(j)
     }
   }
 }
