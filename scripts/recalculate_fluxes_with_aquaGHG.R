@@ -166,6 +166,8 @@ load_incubation <- function(id, auxfile, RData_path){
   return(mydata)
 }
 
+
+
 CO2_flux.auto <- CH4_flux.auto <- CO2_flux.man <- CH4_flux.man <- CH4_diff_flux.man <- NULL
 for (i in unique(table_draws$UniqueID)){
   
@@ -176,28 +178,6 @@ for (i in unique(table_draws$UniqueID)){
     message(paste0("Could not find corresponding auxfile for ",i))
   } else {
     mydata <- load_incubation(id = i, auxfile_i, RData_path)
-    
-    if(auxfile_i$start.time < min(mydata$POSIX.time)){
-      mydiff <- as.numeric(min(mydata$POSIX.time)) - as.numeric(auxfile_i$start.time)
-      warning(paste0("...For ",i, ", 'start.time' in auxfile is earlier than data start by ", round(mydiff*100)/100, " seconds"))
-      if (mydiff < 30){
-        # we accept a tolerance of 30 seconds
-        auxfile_i$start.time <- min(mydata$POSIX.time)
-      } else {stop()}
-    }
-    
-    if(auxfile_i$start.time + auxfile_i$obs.length > max(mydata$POSIX.time)){
-      mydiff <- - as.numeric(max(mydata$POSIX.time)) + as.numeric(auxfile_i$start.time + auxfile_i$obs.length )
-      warning(paste0("...For ",i, ", 'obs.length' in auxfile is longer than data end by ", round(mydiff*100)/100, " seconds"))
-      if (mydiff < 30){
-        # we accept a tolerance of 30 seconds
-        auxfile_i$obs.length <- as.numeric(max(mydata$POSIX.time)) - as.numeric(auxfile_i$start.time)
-      } else {stop()}
-    }
-    # test2 <- my_obs.win(inputfile = mydata,
-    #            auxfile = auxfile_j_co2,
-    #            gastype = "CH4dry_ppb",
-    #            shoulder = 0)
     
     # calculate flux with aquaGHG, no manual selection
     message("... calculate CO2 flux with aquaGHG, no manual selection")
@@ -212,6 +192,7 @@ for (i in unique(table_draws$UniqueID)){
     
     for(j in table_draw_i$uniqAssessID){
       table_draw_j <- table_draw_i[which(table_draw_i$uniqAssessID==j),]
+      
       # change auxfile values based on outputs from expert
       auxfile_j_co2 <- auxfile_j_ch4 <- auxfile_i
       auxfile_j_co2$start.time <- as.POSIXct(table_draw_j$start.time_expert_co2, tz = 'UTC')
@@ -220,26 +201,38 @@ for (i in unique(table_draws$UniqueID)){
       auxfile_j_ch4$start.time <- as.POSIXct(table_draw_j$start.time_expert_ch4, tz = 'UTC')
       auxfile_j_ch4$obs.length <- table_draw_j$duration_expert_ch4
       
-      # calculate flux with aquaGHG, using manual selection from expert
-      ## CO2 flux
-      message("... calculate CO2 flux with aquaGHG, using expert selection")
-      CO2_flux.man_j <- automaticflux(dataframe = mydata, myauxfile = auxfile_j_co2, shoulder = 0, gastype = "CO2dry_ppm", 
-                                      fluxSeparation = FALSE, displayPlots = FALSE, method = "trust.it.all")
-      ## CH4 flux with time windows from CO2
-      message("... calculate CH4 flux with aquaGHG, using expert selection")
-      CH4_flux.man_j <- automaticflux(dataframe = mydata, myauxfile = auxfile_j_co2, shoulder = 0, gastype = "CH4dry_ppb", 
-                                      fluxSeparation = T, displayPlots = FALSE, method = "trust.it.all")
-      ## CH4 flux for selected diffusion only
-      message("... calculate CH4 diffusion flux with aquaGHG, using expert selection")
-      CH4_diff_flux.man_j <- automaticflux(dataframe = mydata, myauxfile = auxfile_j_ch4, shoulder = 0, gastype = "CH4dry_ppb", 
-                                           fluxSeparation = FALSE, displayPlots = FALSE, method = "trust.it.all")
-      
-      # assigning uniqAssessID to all tables
-      CO2_flux.man_j$uniqAssessID <- CH4_flux.man_j$uniqAssessID <- CH4_diff_flux.man_j$uniqAssessID <- j
-      
-      CO2_flux.man <- rbind(CO2_flux.man, CO2_flux.man_j)
-      CH4_flux.man <- rbind(CH4_flux.man, CH4_flux.man_j)
-      CH4_diff_flux.man <- rbind(CH4_diff_flux.man, CH4_diff_flux.man_j)
+      if (auxfile_j_co2$obs.length > 30){
+        # calculate flux with aquaGHG, using manual selection from expert
+        ## CO2 flux
+        message("... calculate CO2 flux with aquaGHG, using expert selection")
+        CO2_flux.man_j <- automaticflux(dataframe = mydata, myauxfile = auxfile_j_co2, shoulder = 0, gastype = "CO2dry_ppm", 
+                                        fluxSeparation = FALSE, displayPlots = FALSE, method = "trust.it.all")
+        ## CH4 flux with time windows from CO2
+        message("... calculate CH4 flux with aquaGHG, using expert selection")
+        CH4_flux.man_j <- automaticflux(dataframe = mydata, myauxfile = auxfile_j_co2, shoulder = 0, gastype = "CH4dry_ppb", 
+                                        fluxSeparation = T, displayPlots = FALSE, method = "trust.it.all")
+        
+        # assigning draw number to ease further data analysis
+        CO2_flux.man_j$draw <- CH4_flux.man_j$draw <- table_draw_j$draw
+        
+        # assigning uniqAssessID
+        CO2_flux.man_j$uniqAssessID <- CH4_flux.man_j$uniqAssessID <- j
+        
+        CO2_flux.man <- rbind(CO2_flux.man, CO2_flux.man_j)
+        CH4_flux.man <- rbind(CH4_flux.man, CH4_flux.man_j)
+      }
+      if (auxfile_j_ch4$obs.length > 30){
+        
+        ## CH4 flux for selected diffusion only
+        message("... calculate CH4 diffusion flux with aquaGHG, using expert selection")
+        CH4_diff_flux.man_j <- automaticflux(dataframe = mydata, myauxfile = auxfile_j_ch4, shoulder = 0, gastype = "CH4dry_ppb", 
+                                             fluxSeparation = FALSE, displayPlots = FALSE, method = "trust.it.all")
+        
+        # assigning draw number to ease further data analysis
+        CH4_diff_flux.man_j$draw <- table_draw_j$draw
+        CH4_diff_flux.man_j$uniqAssessID <- j
+        CH4_diff_flux.man <- rbind(CH4_diff_flux.man, CH4_diff_flux.man_j)
+      }
     }
   }
 }
