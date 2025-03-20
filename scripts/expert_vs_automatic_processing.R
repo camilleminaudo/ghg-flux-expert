@@ -20,7 +20,7 @@ cat("/014") # clear console
 ############### ------- SETTINGS ------- ##################
 
 # SPECIFY HERE YOUR NAME (Firstname + Lastname)
-username <- "X"
+username <- "Camille Minaudo"
 
 # You have to make sure this is pointing to the "RESTORE4Cs - Fieldwork/Data" folder on your local machine
 # For instance, for me it is: "C:/Users/Camille Minaudo/Dropbox/RESTORE4Cs - Fieldwork/Data" 
@@ -147,7 +147,7 @@ nb_draw <- 10 # change this as you please, but not below 2. A value of 10 is a g
     mydata <- mydata[which(mydata$POSIX.time>=myauxfile$start.time[k] & 
                              mydata$POSIX.time<=myauxfile$start.time[k]+myauxfile$duration[k]),]
     mydata$UniqueID <- myauxfile$UniqueID[k]
-    # mydata$Etime <- mydata$POSIX.time - min(mydata$POSIX.time)
+    mydata$Etime <- as.numeric(mydata$POSIX.time) - min(as.numeric(mydata$POSIX.time))
     # 
     # table_draw$corr_co2_ch4[k] <- cor(mydata$CO2dry_ppm, mydata$CH4dry_ppb)
     # mod_lm <- lm(data = mydata, formula = CH4dry_ppb~CO2dry_ppm)
@@ -420,6 +420,8 @@ nb_draw <- 10 # change this as you please, but not below 2. A value of 10 is a g
   
   
   #----- some info about the number of incubations you have processed so far -----
+  
+  table_draws <- load_fs(path = results_path, pattern = "table_draw")
   
   n_done <- length(table_draws$username[table_draws$username==username])
   message(paste(username,", you have processed manually ", n_done,
