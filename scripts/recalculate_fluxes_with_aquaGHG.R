@@ -38,7 +38,7 @@ for (f in files.sources){source(f)}
 dropbox_root <- "C:/Users/Camille Minaudo/Dropbox/RESTORE4Cs - Fieldwork/Data" 
 
 datapath <- paste0(dropbox_root,"/GHG/RAW data")
-RData_path <- paste0(dropbox_root,"/GHG/Processed data/RData/")
+RData_path <- paste0("C:/Users/Camille Minaudo/OneDrive - Universitat de Barcelona/Documentos/PROJECTS/RESTORE4Cs/data/Harmonized_GHG") # be careful with the data in the Dropbox. On 24/03/2025, message sent to Miguel about it
 plots_path <- paste0(dropbox_root,"/GHG/GHG_expert_vs_automated/plots/")
 results_path <- paste0(dropbox_root,"/GHG/GHG_expert_vs_automated/results/")
 
@@ -47,7 +47,6 @@ results_path <- paste0(dropbox_root,"/GHG/GHG_expert_vs_automated/results/")
 setwd(dirname(results_path))
 old <- read.csv(file = "auxfile.csv")
 new <- read.csv(file = "auxfile_20250320.csv")
-auxfile <- old
 
 old$start.time <- as.POSIXct(old$start.time, tz = 'UTC')
 new$start.time <- as.POSIXct(new$start.time, tz = 'UTC')
@@ -61,6 +60,11 @@ auxfile <- old
 auxfile <- auxfile %>% mutate(start.time = as.POSIXct(round(start.time,"secs")))
 auxfile$obs.length <- floor(auxfile$duration)
 
+# example for issue with data stored in RData_path
+# id = "s4-cu-p2-2-o-d-10:28"
+# data = load_incubation(auxfile_i = auxfile[which(auxfile$UniqueID==id),], RData_path = RData_path)
+# 
+# ggplot(data, aes(Etime, CO2dry_ppm))+geom_path()+theme_article()+ggtitle(id)
 
 
 # ---- Loading ghg-expert results ----
@@ -190,6 +194,8 @@ load_incubation <- function(auxfile_i, RData_path){
 }
 
 
+
+
 load_incubation_subsite <- function(subsite, auxfile, RData_path){
   
   message("Loading data for ",subsite)
@@ -236,7 +242,9 @@ table_draws <- table_draws[!table_draws$UniqueID %in% list_different,]
 
 
 CO2_flux.auto <- CH4_flux.auto <- CO2_flux.man <- CH4_flux.man <- CH4_diff_flux.man <- df.no_measurements <- NULL
-for (i in unique(table_draws$UniqueID)){
+list_ids <- unique(table_draws$UniqueID)
+for (k in seq_along(list_ids)){
+  i = list_ids[k]
   message(paste0("processing ",i))
   
   table_draw_i <- table_draws[which(table_draws$UniqueID==i),]
