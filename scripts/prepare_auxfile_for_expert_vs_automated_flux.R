@@ -40,6 +40,8 @@ repo_root <- dirname(dirname(rstudioapi::getSourceEditorContext()$path))
 files.sources = list.files(path = paste0(repo_root,"/functions"), full.names = T)
 for (f in files.sources){source(f)}
 
+source("C:/Projects/myGit/restore4cs-scripts/functions/read_GHG_fieldsheets.R")
+source("C:/Projects/myGit/restore4cs-scripts/functions/get_unix_times.R")
 
 #################################
 
@@ -161,7 +163,7 @@ fieldsheet_Picarro$unix_stop <- map_incubations$stop[corresponding_row]
 # ---- Correct fieldsheets in the case of LiCOR data, whenever available ---
 
 # load incubation map (run get_exact_incubation_times_Licor.R to update it)
-map_incubations <- read.csv( file = paste0(dropbox_root,"/GHG/RAW data/RAW Data Licor-7810/map_incubations.csv"))
+map_incubations <- read.csv( file = paste0(dropbox_root,"/GHG/RAW data/RAW Data Licor-7810/map_incubations_touse.csv"))
 # only select realistic start/stop
 map_incubations <- map_incubations[which(map_incubations$stop-map_incubations$start < 15*60),]
 
@@ -384,7 +386,7 @@ dim(auxfile)
 # saving fluxes estimates
 setwd(dirname(results_path))
 
-write.csv(x = auxfile, file = "auxfile.csv", 
+write.csv(x = auxfile, file = "auxfile_20250320.csv", 
           row.names = F)
 
 
