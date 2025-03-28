@@ -155,6 +155,13 @@ table_draws$diff_t_end_ch4 <- table_draws$end.time_expert_ch4-table_draws$end.ti
 table_draws$duration_expert_co2 <- table_draws$end.time_expert_co2 - table_draws$start.time_expert_co2
 table_draws$duration_expert_ch4 <- table_draws$end.time_expert_ch4 - table_draws$start.time_expert_ch4
 
+setwd(results_path)
+table_draws_all_fixed = table_draws
+save(table_draws_all_fixed, file = "table_draws_fixed.RData")
+table_draws_flagged_co2 <- table_draws[which(table_draws$duration_expert_co2<10),]
+table_draws_flagged_ch4 <- table_draws[which(table_draws$duration_expert_ch4<10),]
+# ggplot(table_draws_flagged_co2, aes(duration_expert_co2))+geom_density()
+# ggplot(table_draws_flagged_ch4, aes(duration_expert_ch4))+geom_density()
 
 table_all$uniqAssessID <- table_draw_fixed$uniqAssessID[match(paste0(table_all$username,table_all$UniqueID,table_all$timestamp_processing), 
                                                               paste0(table_draw_fixed$username,table_draw_fixed$UniqueID,table_draw_fixed$timestamp_processing))]
