@@ -57,10 +57,9 @@ library(scales)
 
 # ---- Functions ----
 
-source("C:/Projects/myGit/aquaGHG/R/get_dxdy.R")
-source("C:/Projects/myGit/aquaGHG/R/get_dCdt_density.R")
-source("C:/Projects/myGit/aquaGHG/R/find_first_linear_chunk.R")
-source("C:/Projects/myGit/aquaGHG/R/find_bubbles.R")
+
+files.sources = list.files(path = "C:/Projects/myGit/aquaGHG/R/", full.names = T)
+for (f in files.sources){source(f)}
 
 get_df_exceedance <- function(relative_diff){
   relative_diff <- relative_diff[!is.na(relative_diff)]
@@ -74,7 +73,6 @@ get_df_exceedance <- function(relative_diff){
   }
   return(df_exceedance)
 }
-
 
 load_this <- function(mylist){
   # load corresponding files
@@ -100,7 +98,7 @@ load_this <- function(mylist){
                              mydata$POSIX.time<=myauxfile$start.time+myauxfile$duration),]
     if(dim(mydata)[1]>0){
       mydata$UniqueID <- myauxfile$UniqueID
-      mydata$Etime <- mydata$POSIX.time - min(mydata$POSIX.time)
+      mydata$Etime <- as.numeric(mydata$POSIX.time) - min(as.numeric(mydata$POSIX.time))
       
       # how many times assessed?
       ind_which <- which(table_draws$UniqueID==id)
@@ -124,7 +122,6 @@ load_this <- function(mylist){
   return(mydata_all)
 }
 
-
 # a function to identify outliers
 getOutliers_n <- function(y){
   
@@ -141,11 +138,9 @@ getOutliers_n <- function(y){
   return(n)
 }
 
-
 standardize.it <- function(x, xmin, xmax){
   x_stand <- (x-xmin)/xmax
 }
-
 
 # a function to get statistics for a group of incubations
 get_stats_incubs <- function(mylist){
@@ -172,9 +167,19 @@ get_stats_incubs <- function(mylist){
                              mydata$POSIX.time<=myauxfile$start.time+myauxfile$duration),]
     mydata$Etime <- as.numeric(mydata$POSIX.time) - min(as.numeric(mydata$POSIX.time))
     if(dim(mydata)[1]>0){
-      
       d_dCdt_co2 <- get_dCdt_density(dataframe = mydata, gastype = "CO2dry_ppm")
       d_dCdt_ch4 <- get_dCdt_density(dataframe = mydata, gastype = "CH4dry_ppb")
+      
+      # detrended_co2 <- data.frame(time = d_dCdt_co2[[2]]$time,
+      #                             conc = d_dCdt_co2[[2]]$conc,
+      #                             trend = d_dCdt_co2[[2]]$concsmooth,
+      #                             flag = abs(d_dCdt_co2[[2]]$conc - d_dCdt_co2[[2]]$concsmooth)/d_dCdt_co2[[2]]$concsmooth > 0.5)
+      # 
+      # # ggplot(detrended_co2, aes(time, conc, colour = flag))+geom_point()+
+      # #   theme_article()
+      # 
+      # n_flag_CO2 <- sum(detrended_co2$flag)
+      
       
       t.win <- 30
       C0_co2 = min(d_dCdt_co2[[2]]$concsmooth[d_dCdt_co2[[2]]$time<t.win])
@@ -197,6 +202,7 @@ get_stats_incubs <- function(mylist){
                             delta_co2 = delta_co2,
                             var_dCdt_co2 = var(d_dCdt_co2[[2]]$dydt),
                             p90_dCdt_co2 = as.numeric(quantile(d_dCdt_co2[[2]]$dydt, 0.9)),
+                            # n_flag_co2 = n_flag_CO2,
                             
                             mean_ch4 = mean(mydata$CH4dry_ppb),
                             var_ch4 = var(mydata$CH4dry_ppb),
@@ -214,9 +220,6 @@ get_stats_incubs <- function(mylist){
   }
   return(mystats_all)
 }
-
-
-
 
 
 # ---- Loading data ----
@@ -284,6 +287,12 @@ load("results/results_ghg_experts_recalculated.Rdata")
 stats_all <- get_stats_incubs(mylist = unique(table_draws$UniqueID))
 names(stats_all)
 
+stats_all$flux_co2 <- CO2_flux.auto$best.flux[match(stats_all$UniqueID, CO2_flux.auto$UniqueID)]
+stats_all$flux_ch4 <- CH4_flux.auto$best.flux[match(stats_all$UniqueID, CH4_flux.auto$UniqueID)]
+stats_all$ebull_ch4 <- CH4_flux.auto$ebullition.flux[match(stats_all$UniqueID, CH4_flux.auto$UniqueID)]
+stats_all$diffus_ch4 <- CH4_diff_flux.man$best.flux[match(stats_all$UniqueID, CH4_diff_flux.man$UniqueID)]
+
+
 # ---- Retrieve timestamp processing for table_draw and making unique IDs ----
 
 # this was done in recalculate_fluxes_with_aquaGHG.R
@@ -349,12 +358,6 @@ ggsave(plot = p_overview_dist, filename = "overview_database_ghg_expert.jpeg", p
 
 
 
-stats_all$flux_co2 <- CO2_flux.auto$best.flux[match(stats_all$UniqueID, CO2_flux.auto$UniqueID)]
-stats_all$flux_ch4 <- CH4_flux.auto$best.flux[match(stats_all$UniqueID, CH4_flux.auto$UniqueID)]
-stats_all$ebull_ch4 <- CH4_flux.auto$ebullition.flux[match(stats_all$UniqueID, CH4_flux.auto$UniqueID)]
-stats_all$diffus_ch4 <- CH4_diff_flux.man$best.flux[match(stats_all$UniqueID, CH4_diff_flux.man$UniqueID)]
-
-
 
 p_co2_ch4_fluxes <- ggplot(stats_all, aes(flux_co2, flux_ch4))+geom_point(alpha=0.5)+
   # xlab("Average CO2 [ppm]")+
@@ -374,96 +377,67 @@ ggplot(stats_all, aes(as.factor(n_bubbles), ebull_ch4))+geom_boxplot(alpha=0.5)+
 
 
 
-
-
 # ---- Flagged anomalous ----
-# threshold_anomalous <- 30 # seconds or n observations
-# 
-# ggplot(table_draws, aes(duration_expert_co2 ))+
-#   geom_histogram(alpha=0.5)+theme_article()+geom_vline(xintercept = threshold_anomalous)
-# ggplot(table_draws, aes(duration_expert_ch4))+
-#   geom_histogram(alpha=0.5)+theme_article()+geom_vline(xintercept = threshold_anomalous)
-# 
-# # table_all$uniqAssessID <- paste(table_all$timestamp_processing, table_all$UniqueID, sep="/")
-# # table_ebull$uniqAssessID <- paste(table_ebull$timestamp_processing, table_ebull$UniqueID, sep="/")
-# 
-# tmpstmp_flag_co2 <- unique(table_draws$uniqAssessID[which(table_draws$duration_expert_co2 < threshold_anomalous)])
-# tmpstmp_flag_ch4 <- unique(table_draws$uniqAssessID[which(table_draws$duration_expert_ch4 < threshold_anomalous)])
-# 
-# incubs_flagged_co2 <- unique(table_all$UniqueID[which(table_all$flux_method=="Expert" & table_all$variable=="CO2" & table_all$nb.obs<threshold_anomalous)])
-# incubs_flagged_ch4 <- unique(table_ebull$UniqueID[which(table_ebull$nb.obs<threshold_anomalous)])[-1]
-# 
-# tmp <- rbind(data.frame(variable = "co2",
-#                         ID = incubs_flagged_co2),
-#              data.frame(variable = "ch4",
-#                         ID = incubs_flagged_ch4))
-# 
-# tmp_flag_both <- tmp[duplicated(tmp$ID), ]
-# tmp_flag_NOTboth <- tmp[ ! tmp$ID %in% tmp_flag_both$ID, ]
-#  
-# # what is special about these flagged incubations?
-# stats_all$co2flagged <- "valid"
-# stats_all$co2flagged[which(stats_all$UniqueID%in%incubs_flagged_co2)] <- "flagged"
-# stats_all$ch4flagged <- "valid"
-# stats_all$ch4flagged[which(stats_all$UniqueID%in%incubs_flagged_ch4)] <- "flagged"
-# 
-# 
-# p_mean_sd_co2_f <- ggplot(stats_all, aes(mean_co2, sd_co2, colour = co2flagged))+geom_point(alpha=0.5)+
-#   xlab("Average CO2 [ppm]")+
-#   ylab("Standard deviation CO2 [ppm]")+
-#   scale_x_log10()+
-#   scale_y_log10()+
-#   theme_article()+
-#   scale_colour_viridis_d(end = .9, option = "A")+
-#   theme(legend.title = element_blank())+ggtitle(paste0("n flagged = ", length(incubs_flagged_co2)))
-# 
-# p_mean_sd_ch4_f <- ggplot(stats_all, aes(mean_ch4, sd_ch4, colour = ch4flagged))+geom_point(alpha=0.5)+
-#   xlab("Average CH4 [ppb]")+
-#   ylab("Standard deviation CH4 [ppb]")+
-#   scale_x_log10()+
-#   scale_y_log10()+
-#   theme_article()+
-#   scale_colour_viridis_d(end = .9, option = "A")+
-#   theme(legend.title = element_blank())+ggtitle(paste0("n flagged = ", length(incubs_flagged_ch4)))
-# 
-# # p_dist_co2 <- ggMarginal(p_mean_sd_co2, type="density", groupFill = T)
-# p_flagged <- ggpubr::ggarrange(p_mean_sd_co2_f, p_mean_sd_ch4_f, common.legend = T, legend = "right")
-# 
-# ggsave(plot = p_flagged, filename = "flagged.jpeg", path = plots_path, 
-#        width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+
+sewd(results_path)
+load("table_draws_fixed.RData")
+
+threshold_anomalous <- 30 # seconds or n observations
+
+ggplot(table_draws_all_fixed, aes(duration_expert_co2 ))+
+  geom_histogram(alpha=0.5)+theme_article()+geom_vline(xintercept = threshold_anomalous)
+ggplot(table_draws_all_fixed, aes(duration_expert_ch4))+
+  geom_histogram(alpha=0.5)+theme_article()+geom_vline(xintercept = threshold_anomalous)
+
+# table_all$uniqAssessID <- paste(table_all$timestamp_processing, table_all$UniqueID, sep="/")
+# table_ebull$uniqAssessID <- paste(table_ebull$timestamp_processing, table_ebull$UniqueID, sep="/")
+
+tmpstmp_flag_co2 <- unique(table_draws_all_fixed$uniqAssessID[which(table_draws_all_fixed$duration_expert_co2 < threshold_anomalous)])
+tmpstmp_flag_ch4 <- unique(table_draws_all_fixed$uniqAssessID[which(table_draws_all_fixed$duration_expert_ch4 < threshold_anomalous)])
+
+incubs_flagged_co2 <- unique(table_draws_all_fixed$UniqueID[table_draws_all_fixed$duration_expert_co2<threshold_anomalous])
+incubs_flagged_ch4 <- unique(table_draws_all_fixed$UniqueID[table_draws_all_fixed$duration_expert_ch4<threshold_anomalous])
+
+tmp <- rbind(data.frame(variable = "co2",
+                        ID = incubs_flagged_co2),
+             data.frame(variable = "ch4",
+                        ID = incubs_flagged_ch4))
+
+tmp_flag_both <- tmp[duplicated(tmp$ID), ]
+tmp_flag_NOTboth <- tmp[ ! tmp$ID %in% tmp_flag_both$ID, ]
+
+# what is special about these flagged incubations?
+stats_all$co2flagged <- "valid"
+stats_all$co2flagged[which(stats_all$UniqueID%in%incubs_flagged_co2)] <- "flagged"
+stats_all$ch4flagged <- "valid"
+stats_all$ch4flagged[which(stats_all$UniqueID%in%incubs_flagged_ch4)] <- "flagged"
 
 
+p_mean_sd_co2_f <- ggplot(stats_all, aes(mean_co2, sd_co2, colour = co2flagged))+geom_point(alpha=0.5)+
+  xlab("Average CO2 [ppm]")+
+  ylab("Standard deviation CO2 [ppm]")+
+  scale_x_log10()+
+  scale_y_log10()+
+  theme_article()+
+  scale_colour_viridis_d(begin = 0.2, end = .9, option = "A", direction = 1)+
+  theme(legend.title = element_blank())+ggtitle(paste0("n flagged = ", length(incubs_flagged_co2)))
 
-# 
-# names(stats_all)
-# 
-# 
-# 
-# ggplot(stats_all, aes(ch4flagged, mean_ch4, colour = ch4flagged))+geom_jitter(alpha=0.5)+
-#   # scale_y_log10()+
-#   scale_colour_viridis_d(begin = 0.1, end = 0.7, option = "A", direction = -1)+
-#   theme_article()
-# 
-# ggplot(stats_all, aes(mean_ch4, sd_ch4, colour = ch4flagged))+geom_jitter(alpha=0.5)+
-#   # scale_y_log10()+
-#   scale_colour_viridis_d(begin = 0.1, end = 0.7, option = "A", direction = -1)+
-#   theme_article()
+p_mean_sd_ch4_f <- ggplot(stats_all, aes(mean_ch4, sd_ch4, colour = ch4flagged))+geom_point(alpha=0.5)+
+  xlab("Average CH4 [ppb]")+
+  ylab("Standard deviation CH4 [ppb]")+
+  scale_x_log10()+
+  scale_y_log10()+
+  theme_article()+
+  scale_colour_viridis_d(begin = 0.2, end = .9, option = "A", direction = 1)+
+  theme(legend.title = element_blank())+ggtitle(paste0("n flagged = ", length(incubs_flagged_ch4)))
+
+# p_dist_co2 <- ggMarginal(p_mean_sd_co2, type="density", groupFill = T)
+p_flagged <- ggpubr::ggarrange(p_mean_sd_co2_f, p_mean_sd_ch4_f, common.legend = T, legend = "right")
+
+ggsave(plot = p_flagged, filename = "flagged.jpeg", path = plots_path,
+       width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
 
 
-# # evidence the ones with clear cuts
-# 
-# table_draws$duration_auto <- table_draws$end.time_auto - table_draws$start.time_auto
-# table_draws$duration_ratio <- table_draws$duration_expert_co2/table_draws$duration_auto
-# 
-# ggplot(table_draws, aes(duration_ratio))+geom_histogram()+theme_article()+geom_vline(xintercept = .75)
-# 
-# list_much_shorter <- table_draws$UniqueID[which(table_draws$duration_ratio>.10 & table_draws$duration_ratio<.25)]
-# 
-# mydata_all <- load_this(mylist = list_flag_co2)
-# 
-# 
-# ggplot(mydata_all, aes(Etime, CO2dry_ppm, colour = flag_score_num, group_by = UniqueID))+geom_path()+theme_article()+
-#   facet_wrap(UniqueID~., scales = "free_y")+scale_colour_viridis_c(option = "C", direction = -1)
 
 
 
@@ -510,6 +484,32 @@ df_multiple_users_co2$abs_diff <- abs(df_multiple_users_co2$flux_blind-df_multip
 df_multiple_users_co2$rel_diff <- (df_multiple_users_co2$flux_blind-df_multiple_users_co2$flux_users_mean)/df_multiple_users_co2$flux_users_mean*100
 
 
+flux_ref = CO2_flux.man$best.flux
+flux_model = CO2_flux.auto$best.flux[match(CO2_flux.man$UniqueID, CO2_flux.auto$UniqueID)]
+df_exceedance_CO2 <- get_df_exceedance(abs(flux_model - flux_ref)/flux_model*100)
+ind_closest_10 <- which.min(abs(df_exceedance_CO2$t-10))
+
+p_exceed <- ggplot(df_exceedance_CO2, aes(t, p))+geom_path()+geom_point()+
+  geom_hline(yintercept = 0)+
+  theme_bw()+
+  geom_segment(aes(x=-0,xend=10,
+                   y=df_exceedance_CO2$p[ind_closest_10], yend=df_exceedance_CO2$p[ind_closest_10]), color ="red")+
+  geom_segment(aes(x=10,xend=10,
+                   y=-Inf, yend=df_exceedance_CO2$p[ind_closest_10]), color ="red")+
+  # scale_x_log10()+
+  scale_x_continuous(transform = "log10", breaks = c(1,10,100,1000))+
+  ylab("Proportion of timeseries [%]")+
+  xlab("Relative difference [% of Expert flux]")+
+  ggtitle(paste0(round(df_exceedance_CO2$p[ind_closest_10]*10)/10,"% timeseries with < 10% difference"))
+
+p_exceed
+ggsave(plot = p_exceed, filename = "overview_expert_vs_blind_co2.jpg", path = plots_path, 
+       width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+
+
+
+
+
 names(df_multiple_users_co2)
 
 
@@ -517,20 +517,22 @@ p1 <- ggplot(df_multiple_users_co2, aes(flux_blind, flux_users_mean, colour = n)
   scale_x_log10()+
   scale_y_log10()+
   geom_abline(slope = 1, intercept = 0)+
-  geom_point()+
+  geom_point(aes(size=g.fact))+
   geom_errorbar(aes(ymin=flux_users_mean-flux_users_sd, 
                     ymax=flux_users_mean+flux_users_sd))+
   xlab("Blind LM (CO2)")+
   ylab("Expert LM (CO2)")+
+  scale_size(range = c(1,5))+
   scale_colour_viridis_c(direction = -1, option = "A", begin = 0.1, end = 0.9)+
   theme_article()
 
 
-p2 <- ggplot(df_multiple_users_co2, aes(abs_diff, abs(flux_users_CV), colour = n))+geom_point()+
+p2 <- ggplot(df_multiple_users_co2, aes(abs_diff, abs(flux_users_CV), colour = n, size=g.fact))+geom_point()+
   scale_x_log10()+
   scale_y_log10()+
   xlab("abs((Blind - mean(Expert)) [CO2 flux]")+
   ylab("abs(CV(Expert)) [d.l.]")+
+  scale_size(range = c(1,5))+
   scale_colour_viridis_c(direction = -1, option = "A", begin = 0.1, end = 0.9)+
   theme_article()
 
@@ -541,9 +543,8 @@ ggsave(plot = p_expert_vs_blind_CO2, filename = "expert_vs_blind_CO2.jpeg", path
 
 
 
-
 # plot incubations with the highest disagreements between experts
-list_ids <- df_multiple_users_co2$id[which(abs(df_multiple_users_co2$flux_users_CV)>1)]
+list_ids <- df_multiple_users_co2$id[which(abs(df_multiple_users_co2$flux_users_CV)>2)]
 
 mydata_sel <- load_this(mylist = list_ids)
 table_draws_sel <- table_draws[which(table_draws$UniqueID%in%list_ids),]
@@ -553,7 +554,7 @@ table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_co2-(table_draws_s
 
 p_disagree_CO2 <- ggplot()+
   geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
-                                              ymin = -Inf, ymax = Inf), fill="grey50", alpha=0.2)+
+                                              ymin = -Inf, ymax = Inf, fill=userID), alpha=0.2)+
   geom_path(data = mydata_sel, aes(as.numeric(Etime), CO2dry_ppm, group = UniqueID))+
   theme_article()+
   xlab("Elapsed time [secs]")+
@@ -583,7 +584,7 @@ ggplot()+
 
 
 
-# ---- Differences between experts CH4 ----
+# ---- Differences between experts CH4 - COMPUTING ----
 
 isF <- T
 runID <- 0
@@ -615,7 +616,7 @@ for(i in list_multiple_experts){
                                               ebull_users_sd = sd(tab_users$ebullition.flux),
                                               ebull_users_CV = sd(tab_users$ebullition.flux)/mean(tab_users$ebullition.flux),
                                               
-                                              diffusion_blind = CH4_flux.auto$ebullition.flux[i_flux_blind],
+                                              diffusion_blind = CH4_flux.auto$diffusion.flux[i_flux_blind],
                                               diffusion_users_mean = mean(tab_diff_users$best.flux),
                                               diffusion_users_sd = sd(tab_diff_users$best.flux),
                                               diffusion_users_CV = sd(tab_diff_users$best.flux)/mean(tab_diff_users$best.flux)))
@@ -634,10 +635,38 @@ df_multiple_users_CH4$ebull_rel_diff <- (df_multiple_users_CH4$ebull_blind-df_mu
 
 names(df_multiple_users_CH4)
 
-# Total flux
+
+
+# ---- Differences between experts TOTAL CH4 ----
+
+
+flux_ref = CH4_flux.man$total.flux
+flux_model = CH4_flux.auto$total.flux[match(CH4_flux.man$UniqueID, CH4_flux.auto$UniqueID)]
+df_exceedance_CH4 <- get_df_exceedance(abs(flux_model - flux_ref)/flux_model*100)
+ind_closest_10 <- which.min(abs(df_exceedance_CH4$t-10))
+
+p_exceed <- ggplot(df_exceedance_CH4, aes(t, p))+geom_path()+geom_point()+
+  geom_hline(yintercept = 0)+
+  theme_bw()+
+  geom_segment(aes(x=-0,xend=10,
+                   y=df_exceedance_CH4$p[ind_closest_10], yend=df_exceedance_CH4$p[ind_closest_10]), color ="red")+
+  geom_segment(aes(x=10,xend=10,
+                   y=-Inf, yend=df_exceedance_CH4$p[ind_closest_10]), color ="red")+
+  # scale_x_log10()+
+  scale_x_continuous(transform = "log10", breaks = c(1,10,100,1000))+
+  ylab("Proportion of timeseries [%]")+
+  xlab("Relative difference [% of Expert flux]")+
+  ggtitle(paste0(round(df_exceedance_CH4$p[ind_closest_10]*10)/10,"% timeseries with < 10% difference"))
+
+p_exceed
+ggsave(plot = p_exceed, filename = "overview_expert_vs_blind_ch4_total_flux.jpg", path = plots_path, 
+       width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+
+
 
 df_multiple_users_CH4$ebull_contrib <- df_multiple_users_CH4$ebull_blind/df_multiple_users_CH4$total_blind
 
+df_multiple_users_CH4 <- df_multiple_users_CH4[df_multiple_users_CH4$ebull_contrib >=0 & df_multiple_users_CH4$ebull_contrib<=1,]
 
 p_tot <- ggplot(df_multiple_users_CH4[!is.na(df_multiple_users_CH4$ebull_contrib),],
        aes(factor(ceiling(ebull_contrib*10/2)*2/10), total_abs_diff))+
@@ -713,9 +742,7 @@ ggsave(plot = p_expert_vs_blind_CH4tot, filename = "expert_vs_blind_CH4tot.jpeg"
 
 
 # plot incubations with the highest disagreements between experts
-list_ids <- df_multiple_users_CH4$id[which(abs(df_multiple_users_CH4$total_users_CV)>0.9)]
-
-# list_ids <- df_multiple_users_CH4$id[which(abs(df_multiple_users_CH4$ebull_blind)>1500)]
+list_ids <- tail(df_multiple_users_CH4$id[order(df_multiple_users_CH4$total_users_CV)], 9)
 
 mydata_sel <- load_this(mylist = list_ids)
 table_draws_sel <- table_draws[which(table_draws$UniqueID%in%list_ids),]
@@ -724,8 +751,8 @@ table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_ch4-(table_draws_s
 
 p_disagree_CH4tot <- ggplot()+
   geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
-                                              ymin = -Inf, ymax = Inf), 
-            fill="grey50", 
+                                              ymin = -Inf, ymax = Inf, fill=userID), 
+            # fill="grey50", 
             alpha=0.2)+
   geom_path(data = mydata_sel, aes(as.numeric(Etime), CH4dry_ppb, group = UniqueID))+
   theme_article()+
@@ -733,10 +760,35 @@ p_disagree_CH4tot <- ggplot()+
   facet_wrap(UniqueID~., scales = "free")
 
 ggsave(plot = p_disagree_CH4tot, filename = "expert_choice_CH4tot.jpeg", path = plots_path, 
-       width = 12, height = 10, dpi = 300, units = 'in', scale = 1.0)
+       width = 8, height = 6, dpi = 300, units = 'in', scale = 1.0)
 
 
-# Diffusion
+# ---- Differences between experts DIFFUSION CH4 ----
+
+flux_ref = CH4_diff_flux.man$best.flux
+flux_model = CH4_flux.auto$diffusion.flux[match(CH4_diff_flux.man$UniqueID, CH4_flux.auto$UniqueID)]
+df_exceedance_CH4 <- get_df_exceedance(abs(flux_model - flux_ref)/flux_model*100)
+ind_closest_10 <- which.min(abs(df_exceedance_CH4$t-10))
+
+p_exceed <- ggplot(df_exceedance_CH4, aes(t, p))+geom_path()+geom_point()+
+  geom_hline(yintercept = 0)+
+  theme_bw()+
+  geom_segment(aes(x=-0,xend=10,
+                   y=df_exceedance_CH4$p[ind_closest_10], yend=df_exceedance_CH4$p[ind_closest_10]), color ="red")+
+  geom_segment(aes(x=10,xend=10,
+                   y=-Inf, yend=df_exceedance_CH4$p[ind_closest_10]), color ="red")+
+  # scale_x_log10()+
+  scale_x_continuous(transform = "log10", breaks = c(1,10,100,1000))+
+  ylab("Proportion of timeseries [%]")+
+  xlab("Relative difference [% of Expert flux]")+
+  ggtitle(paste0(round(df_exceedance_CH4$p[ind_closest_10]*10)/10,"% timeseries with < 10% difference"))
+
+p_exceed
+ggsave(plot = p_exceed, filename = "overview_expert_vs_blind_ch4_diffusion.jpg", path = plots_path, 
+       width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+
+
+
 p1 <- ggplot(df_multiple_users_CH4, aes(diffusion_blind, diffusion_users_mean, colour = n))+
   scale_x_log10()+
   scale_y_log10()+
@@ -767,7 +819,7 @@ ggsave(plot = p_expert_vs_blind_CH4diff, filename = "expert_vs_blind_CH4diff.jpe
 
 
 # plot incubations with the highest disagreements between experts
-list_ids <- df_multiple_users_CH4$id[which(abs(df_multiple_users_CH4$diffusion_users_CV)>1)]
+list_ids <- tail(df_multiple_users_CH4$id[order(df_multiple_users_CH4$diffusion_users_CV)], 9)
 
 mydata_sel <- load_this(mylist = list_ids)
 table_draws_sel <- table_draws[which(table_draws$UniqueID%in%list_ids),]
@@ -778,24 +830,50 @@ table_draws_sel[order(table_draws_sel$UniqueID),]
 
 p_disagree_CH4diff <- ggplot()+
   geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
-                                              ymin = -Inf, ymax = Inf), 
-            fill="grey50", 
+                                              ymin = -Inf, ymax = Inf, fill=userID), 
+            # fill="grey50", 
             alpha=0.2)+
-  geom_path(data = mydata_sel, aes(as.numeric(Etime), CH4dry_ppb, group_by = UniqueID))+
+  geom_path(data = mydata_sel, aes(as.numeric(Etime), CH4dry_ppb, group = UniqueID))+
   theme_article()+
   xlab("Elapsed time [secs]")+
   facet_wrap(UniqueID~., scales = "free")
 ggsave(plot = p_disagree_CH4diff, filename = "expert_choice_CH4diff.jpeg", path = plots_path, 
-       width = 12, height = 10, dpi = 300, units = 'in', scale = 1.0)
+       width = 8, height = 6, dpi = 300, units = 'in', scale = 1.0)
 
 
 
 
-# Ebullition
+# ---- Differences between experts EBULLITION CH4 ----
+
+
+flux_ref = CH4_flux.man$ebullition.flux
+flux_model = CH4_flux.auto$ebullition.flux[match(CH4_flux.man$UniqueID, CH4_flux.auto$UniqueID)]
+df_exceedance_CH4 <- get_df_exceedance(abs(flux_model - flux_ref)/flux_model*100)
+ind_closest_10 <- which.min(abs(df_exceedance_CH4$t-10))
+
+p_exceed <- ggplot(df_exceedance_CH4, aes(t, p))+geom_path()+geom_point()+
+  geom_hline(yintercept = 0)+
+  theme_bw()+
+  geom_segment(aes(x=-0,xend=10,
+                   y=df_exceedance_CH4$p[ind_closest_10], yend=df_exceedance_CH4$p[ind_closest_10]), color ="red")+
+  geom_segment(aes(x=10,xend=10,
+                   y=-Inf, yend=df_exceedance_CH4$p[ind_closest_10]), color ="red")+
+  # scale_x_log10()+
+  scale_x_continuous(transform = "log10", breaks = c(1,10,100,1000))+
+  ylab("Proportion of timeseries [%]")+
+  xlab("Relative difference [% of Expert flux]")+
+  ggtitle(paste0(round(df_exceedance_CH4$p[ind_closest_10]*10)/10,"% timeseries with < 10% difference"))
+
+p_exceed
+ggsave(plot = p_exceed, filename = "overview_expert_vs_blind_ch4_diffusion.jpg", path = plots_path, 
+       width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+
+
+
 ggplot(df_multiple_users_CH4, aes(ebull_contrib))+geom_density()+theme_article()
 
 
-df_ebull <- df_multiple_users_CH4[df_multiple_users_CH4$ebull_contrib>0.05,]
+df_ebull <- df_multiple_users_CH4[df_multiple_users_CH4$ebull_blind>0 & df_multiple_users_CH4$ebull_users_mean>0,]
 p1 <- ggplot(df_ebull, aes(ebull_blind, ebull_users_mean, colour = n))+
   scale_x_log10()+
   scale_y_log10()+
@@ -825,27 +903,26 @@ ggsave(plot = p_expert_vs_blind_CH4ebull, filename = "expert_vs_blind_CH4ebull.j
 
 
 
-# plot incubations with the highest ebullition contribution
+# plot incubations with the highest disagreements
 
-list_ids <- df_ebull$id[which(df_ebull$ebull_contrib>.9)]
+list_ids <- tail(df_multiple_users_CH4$id[order(df_multiple_users_CH4$ebull_users_mean)], 9)
 
 mydata_sel <- load_this(mylist = list_ids)
 table_draws_sel <- table_draws[which(table_draws$UniqueID%in%list_ids),]
 table_draws_sel$Etime_start <- table_draws_sel$start.time_expert_ch4-(table_draws_sel$start.time_auto)
 table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_ch4-(table_draws_sel$start.time_auto)
 
-
 p_disagree_CH4ebull <- ggplot()+
   geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
-                                              ymin = -Inf, ymax = Inf), 
-            fill="grey50", 
+                                              ymin = -Inf, ymax = Inf, fill= userID), 
+            # fill="grey50", 
             alpha=0.2)+
   geom_path(data = mydata_sel, aes(as.numeric(Etime), CH4dry_ppb, group = UniqueID))+
   theme_article()+
   xlab("Elapsed time [secs]")+
   facet_wrap(UniqueID~., scales = "free")
 ggsave(plot = p_disagree_CH4ebull, filename = "expert_choice_CH4ebull.jpeg", path = plots_path, 
-       width = 12, height = 10, dpi = 300, units = 'in', scale = 1.0)
+       width = 8, height = 6, dpi = 300, units = 'in', scale = 1.0)
 
 
 
@@ -867,6 +944,17 @@ ggplot()+
   facet_grid(username~UniqueID, scales = "free")
 
 
+# ---- relationship between disagreements on CH4diff and CH4tot or CH4ebull? ----
+
+
+ggplot(df_multiple_users_CH4, aes(total_rel_diff, diffusion_rel_diff))+
+  geom_point()+
+  geom_smooth(method = 'lm')+
+  scale_x_log10()+
+  scale_y_log10()+
+  theme_article()+
+  xlab("Total abs((Blind - mean(Expert))/mean(Expert) [%]")+
+  ylab("Diffusion abs((Blind - mean(Expert))/mean(Expert) [%]")
 
 
 
@@ -875,10 +963,274 @@ ggplot()+
 
 
 
+head(CH4_flux.man$uniqAssessID, 50)
+head(CH4_diff_flux.man$uniqAssessID, 50)
+
+CH4_diff_flux.man$diffusion.flux <- CH4_diff_flux.man$best.flux
+CH4_diff_flux.man$ebullition.flux <- CH4_flux.man$ebullition.flux[match(CH4_diff_flux.man$uniqAssessID, CH4_flux.man$uniqAssessID)]
+CH4_diff_flux.man$total.flux <- CH4_flux.man$total.flux[match(CH4_diff_flux.man$uniqAssessID, CH4_flux.man$uniqAssessID)]
+CH4_diff_flux.man$total.flux_auto <- CH4_flux.auto$best.flux[match(CH4_diff_flux.man$UniqueID, CH4_flux.auto$UniqueID)]
+CH4_diff_flux.man$ebullition.flux_auto <- CH4_flux.auto$ebullition.flux[match(CH4_diff_flux.man$UniqueID, CH4_flux.auto$UniqueID)]
+
+CH4_diff_flux.man$ebullition.flux_bydifference <- CH4_diff_flux.man$total.flux - CH4_diff_flux.man$diffusion.flux
+
+
+ggplot(CH4_diff_flux.man, aes(total.flux, total.flux_auto))+geom_point()+
+  geom_abline(slope = 1, intercept = 0)+
+  scale_x_log10()+
+  scale_y_log10()+
+  xlab("Total CH4 flux based on delta C over incubation")+
+  ylab("Total CH4 based on curve fitting")+theme_article()
+
+
+
+ggplot(CH4_diff_flux.man, aes(ebullition.flux, ebullition.flux_bydifference))+geom_point()+
+  geom_abline(slope = 1, intercept = 0)+
+  # scale_x_log10()+
+  # scale_y_log10()+
+  xlab("CH4 ebullition based on flux.separator")+
+  ylab("CH4 ebullition = total - manual diffusion")+theme_article()
+
+
+ggplot(CH4_diff_flux.man, aes(ebullition.flux, ebullition.flux_auto))+geom_point()+
+  geom_abline(slope = 1, intercept = 0)+
+  scale_x_log10()+
+  scale_y_log10()+
+  xlab("Ebullition with flux.separator after manual selection")+
+  ylab("Ebullition with flux.separator no manual selection")+theme_article()
+
+
+head(df_multiple_users_CH4)
+
+ggplot(df_multiple_users_CH4, aes(ebull_abs_diff, diffusion_abs_diff))+geom_point()+
+  scale_x_log10()+
+  scale_y_log10()
+
+
+
+plot()
+
+# ---- Do we really need flux.separator to estimate total.flux? ----
+
+CH4_flux.auto$ebullition.contrib <- CH4_flux.auto$ebullition.flux / CH4_flux.auto$total.flux
+
+flux_ref = CH4_flux.auto$total.flux
+flux_model = CH4_flux.auto$best.flux
+df_exceedance_CH4 <- get_df_exceedance(abs(flux_model - flux_ref)/flux_model*100)
+ind_closest_10 <- which.min(abs(df_exceedance_CH4$t-10))
+
+p_exceed <- ggplot(df_exceedance_CH4, aes(t, p))+geom_path()+geom_point()+
+  geom_hline(yintercept = 0)+
+  theme_bw()+
+  geom_segment(aes(x=-0,xend=10,
+                   y=df_exceedance_CH4$p[ind_closest_10], yend=df_exceedance_CH4$p[ind_closest_10]), color ="red")+
+  geom_segment(aes(x=10,xend=10,
+                   y=-Inf, yend=df_exceedance_CH4$p[ind_closest_10]), color ="red")+
+  # scale_x_log10()+
+  scale_x_continuous(transform = "log10", breaks = c(1,10,100,1000))+
+  ylab("Proportion of timeseries [%]")+
+  xlab("Relative difference [% of Expert flux]")+
+  ggtitle(paste0(round(df_exceedance_CH4$p[ind_closest_10]*10)/10,"% timeseries with < 10% difference"))
+
+p_exceed
+
+p_goflux_vs_deltaC <- ggplot(CH4_flux.auto[CH4_flux.auto$ebullition.contrib >=0 & CH4_flux.auto$ebullition.contrib <= 1,], 
+       aes(best.flux, total.flux, size = ebullition.contrib))+geom_point()+
+  scale_x_log10()+
+  scale_y_log10()+
+  scale_size(range = c(0.1,3))+
+  xlab("Total CH4 flux with goFlux [nmol m-2 s-1]")+
+  ylab("Total CH4 flux using delta C [nmol m-2 s-1]")+
+  theme_article()+
+  ggtitle(paste0(round(df_exceedance_CH4$p[ind_closest_10]*10)/10,"% timeseries with < 10% difference"))
+
+
+ggsave(plot = p_goflux_vs_deltaC, filename = "goflux_vs_ch4_total_flux.jpg", path = plots_path,
+       width = 6, height = 4, dpi = 300, units = 'in', scale = 1.0)
 
 
 
 
+
+
+# ---- An example of how flux.separator works ----
+
+require(goFlux)
+require(ggnewscale)
+
+auxfile$obs.length <- auxfile$duration
+
+list_ids <- head(df_multiple_users_CH4$id[order(df_multiple_users_CH4$ebull_contrib)], 9)
+
+for(i in seq_along(list_ids)){
+  mydata_sel <- load_this(mylist = list_ids[i])
+  # print(plot_incubations(mydata_sel))
+  
+  automaticflux(dataframe = mydata_sel, myauxfile = auxfile, shoulder = 0, 
+                gastype = "CH4dry_ppb", fluxSeparation = T, displayPlots = T, method = "trust.it.all")
+  
+}
+
+clickflux(dataframe = mydata_sel, myauxfile = auxfile, shoulder = 0, 
+              gastype = "CH4dry_ppb", fluxSeparation = F, displayPlots = T, plot.lim = c(2000, max(mydata_sel$CH4dry_ppb)))
+
+
+
+
+# ---- Does CH4 bubbling cause major disruptions in CO2 flux measurements ? ----
+
+stats_all$ebullition.detected <- stats_all$ebull_ch4>0
+
+ggplot(stats_all, aes(n_flag_co2+1, colour = ebullition.detected))+
+  geom_density(alpha=0.5)+
+  scale_x_log10()+
+  # scale_y_log10()+
+  scale_colour_viridis_d(option = "B", begin = 0, end = 0.7)+
+  theme_article()+theme(legend.position = c(0.8,0.2))
+
+
+
+list_ids <- stats_all$UniqueID[which(stats_all$ebull_ch4>100 & stats_all$ebull_ch4<1000)]
+
+
+mydata_sel <- load_this(mylist = list_ids)
+mydata_sel<- mydata_sel[order(mydata_sel$POSIX.time),]
+table_draws_sel <- table_draws[which(table_draws$UniqueID%in%list_ids),]
+table_draws_sel$Etime_start <- table_draws_sel$start.time_expert_co2-(table_draws_sel$start.time_auto)
+table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_co2-(table_draws_sel$start.time_auto)
+
+ggplot()+
+  geom_path(data = mydata_sel, aes(as.numeric(Etime), CO2dry_ppm, group = UniqueID))+
+  theme_article()+
+  facet_wrap(.~UniqueID, scales = "free")
+
+
+ggplot()+
+  geom_path(data = mydata_sel, aes(as.numeric(Etime), CH4dry_ppb, group = UniqueID))+
+  theme_article()+
+  facet_wrap(.~UniqueID, scales = "free")
+
+
+ggplot()+
+  geom_path(data = mydata_sel, aes(CO2dry_ppm, CH4dry_ppb, group = UniqueID))+
+  theme_article()+
+  facet_wrap(.~UniqueID, scales = "free")
+
+
+print(plot_incubations(mydata_sel))
+
+
+
+list_ids <- df_ebull$id[which(df_ebull$ebull_contrib>.9)]
+mydata_sel <- load_this(mylist = list_ids)
+mydata_sel<- mydata_sel[order(mydata_sel$POSIX.time),]
+table_draws_sel <- table_draws[which(table_draws$UniqueID%in%list_ids),]
+table_draws_sel$Etime_start <- table_draws_sel$start.time_expert_ch4-(table_draws_sel$start.time_auto)
+table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_ch4-(table_draws_sel$start.time_auto)
+
+ggplot()+
+  geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
+                                        ymin = -Inf, ymax = Inf, fill = username), 
+            # fill="grey50", 
+            alpha=0.2)+
+  geom_path(data = mydata_sel, aes(as.numeric(Etime), CO2dry_ppm, group = UniqueID))+
+  theme_article()+
+  facet_wrap(.~UniqueID, scales = "free")
+
+
+ggplot()+
+  geom_path(data = mydata_sel, aes(CO2dry_ppm, CH4dry_ppb, group = UniqueID))+
+  theme_article()+
+  facet_wrap(.~UniqueID, scales = "free")
+
+
+mydata_sel$Etime <- as.numeric(mydata_sel$Etime)
+print(plot_incubations(dataframe = mydata_sel))
+
+
+
+
+
+p_mean_sd <- ggplot(stats_all, aes(mean_ch4, sd_ch4, colour = ebullition.detected))+
+  geom_point(alpha=0.5)+
+  scale_x_log10()+
+  scale_y_log10()+
+  scale_colour_viridis_d(option = "B", begin = 0, end = 0.7)+
+  theme_article()+theme(legend.position = c(0.8,0.2))
+
+ggMarginal(p_mean_sd, type="density", groupColour = T)
+
+
+
+list_ids <- stats_all$UniqueID[which(!stats_all$ebullition.detected & stats_all$sd_ch4>1e+4)]
+mydata_sel <- load_this(mylist = list_ids)
+mydata_sel<- mydata_sel[order(mydata_sel$POSIX.time),]
+ggplot()+
+  geom_path(data = mydata_sel, aes(as.numeric(Etime), CH4dry_ppb, group = UniqueID))+
+  theme_article()+
+  facet_wrap(.~UniqueID, scales = "free")
+
+CH4_flux.auto[which(CH4_flux.auto$UniqueID == "s3-da-a2-8-o-d-08:20"),]
+stats_all[stats_all$UniqueID=="s3-da-a2-8-o-d-08:20",]
+
+
+id = "s3-da-a2-8-o-d-08:20"
+mydata_sel <- load_this(mylist = id)
+print(plot_incubations(mydata_sel))
+
+
+# do we see any relationship between bubbling and sd(CH4)?
+
+list_ids_suspicious <- CH4_flux.auto$UniqueID[which(CH4_flux.auto$ebullition.flux>1000)]
+
+stats_all_sel <- stats_all[! stats_all$UniqueID %in% list_ids_suspicious,]
+stats_all_sel <- stats_all_sel[stats_all_sel$ebull_ch4>0,]
+
+# do we see larger sd(CH4) when ebullition flux is larger?
+ggplot(stats_all_sel, aes(ebull_ch4, sd_ch4))+
+  geom_point()+
+  geom_smooth(method = "lm")+
+  scale_x_log10()+
+  scale_y_log10()+
+    theme_article()
+
+
+ggplot(stats_all, aes(ebull_ch4, sd_ch4))+
+  geom_point()+
+  # scale_x_log10()+
+  scale_y_log10()+
+  geom_smooth(method = "lm")+
+  theme_article()
+
+# do we see large sd(CO2) when ebullition flux is larger?
+ggplot(stats_all[! stats_all$UniqueID %in% list_ids_suspicious,], aes(sd_co2, ebull_ch4))+geom_point()+theme_article()+
+  scale_x_log10()+
+  scale_y_log10()
+
+ggplot(stats_all[! stats_all$UniqueID %in% list_ids_suspicious,], aes(ebull_ch4, var_dCdt_co2))+
+  geom_point()+
+  scale_x_log10()+
+  scale_y_log10()+
+  theme_article()
+
+
+
+# do we see poor fits for CO2 when bubbling is detected?
+stats_all$LM.MAE_co2 <- CO2_flux.auto$LM.MAE[match(stats_all$UniqueID, CO2_flux.auto$UniqueID)]
+stats_all$LM.SE_co2 <- CO2_flux.auto$LM.SE[match(stats_all$UniqueID, CO2_flux.auto$UniqueID)]
+stats_all$LM.r2_co2 <- CO2_flux.auto$LM.r2[match(stats_all$UniqueID, CO2_flux.auto$UniqueID)]
+
+
+
+stats_all_joined <- stats_all %>%
+  left_join(CO2_flux.auto, by = "UniqueID")
+
+
+
+ggplot(stats_all_joined[stats_all_joined$ebull_ch4>0,], aes(ebull_ch4, var_co2))+geom_point()+
+  scale_x_log10()+
+  scale_y_log10()+
+  theme_article()
 
 
 
@@ -896,30 +1248,52 @@ ggplot()+
 
 # ---- CO2 fluxes LM vs HM ----
 
-CO2 <- table_all[table_all$variable=="CO2",]
-# get rid of incubations flagged as anomalous
-CO2 <- CO2[ ! CO2$UniqueID %in% list_flag_co2, ]
 
+table(CO2_flux.man$model)
 
-table(CO2$model)
+prop_best_HM <- table(CO2_flux.man$model)[1]/sum(table(CO2_flux.man$model))*100
 
-prop_best_HM <- table(table_all$model)[1]/sum(table(table_all$model))*100
+CO2_flux.man$diff_abs_LM_HM <- (CO2_flux.man$LM.flux - CO2_flux.man$HM.flux)
+CO2_flux.man$diff_rel_LM_HM <- CO2_flux.man$diff_abs_LM_HM/CO2_flux.man$LM.flux*100
 
-table_all$diff_abs_LM_HM <- table_all$LM.flux - table_all$HM.flux
-table_all$diff_rel_LM_HM <- table_all$diff_abs_LM_HM/table_all$LM.flux*100
-
-ggplot(data = table_all)+
+ggplot(data = CO2_flux.man)+
   geom_abline(slope = 1,intercept = 0, color = 'grey')+
   geom_point(aes(LM.flux, HM.flux))+
-  scale_x_log10()+
-  scale_y_log10()+
+  # scale_x_log10()+
+  # scale_y_log10()+
   xlab("LM automated CO2 flux [mmol/m2/s]")+
   ylab("HM CO2 flux [mmol/m2/s]")+
   theme_bw()
 
-prop_below10 <- length(which(table_all$diff_rel_LM_HM<10))/length(table_all$UniqueID)*100
+prop_below10 <- length(which(CO2_flux.man$diff_rel_LM_HM<10))/length(CO2_flux.man$UniqueID)*100
 
 message(paste("For both CO2 and CH4, better fit with HM for ",round(prop_best_HM),"% but difference with LM < 10% for ", round(prop_below10),"%"))
+
+
+
+# negative fluxes
+
+# examples of very weird choices from dear experts
+list_ids <- CO2_flux.man$UniqueID[which(CO2_flux.man$HM.flux< -1)]
+
+mydata_sel <- load_this(mylist = list_ids)
+mydata_sel<- mydata_sel[order(mydata_sel$POSIX.time),]
+table_draws_sel <- table_draws[which(table_draws$UniqueID%in%list_ids),]
+table_draws_sel$Etime_start <- table_draws_sel$start.time_expert_ch4-(table_draws_sel$start.time_auto)
+table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_ch4-(table_draws_sel$start.time_auto)
+
+ggplot()+
+  geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
+                                        ymin = -Inf, ymax = Inf, fill = username), 
+            # fill="grey50", 
+            alpha=0.2)+
+  geom_path(data = mydata_sel, aes(as.numeric(Etime), CO2dry_ppm, group = UniqueID))+
+  theme_article()+
+  facet_grid(UniqueID~username, scales = "free")
+
+
+
+
 
 
 # ---- CO2 fluxes expert vs "blind" ----
