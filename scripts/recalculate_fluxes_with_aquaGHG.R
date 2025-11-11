@@ -202,54 +202,13 @@ load_incubation <- function(auxfile_i, RData_path){
 
 
 
-
-load_incubation_subsite <- function(subsite, auxfile, RData_path){
-  
-  message("Loading data for ",subsite)
-  
-  auxfile_i <- auxfile[auxfile$subsite==subsite,]
-  
-  
-  gass <- unique(auxfile_i$gas_analiser)
-  
-  for(gas in gass){
-    
-    setwd(RData_path)
-    if(gas== "LI-COR"){
-      gs_suffix <- "LI-7810"
-    } else {
-      gs_suffix <- gas
-    }
-    load(file = paste0(subsite,"_",gs_suffix,".RData"))
-    mydata <- mydata[,c("POSIX.time", 
-                        "CO2dry_ppm", "CH4dry_ppb", "H2O_ppm",
-                        "CO2_prec",   "CH4_prec",   "H2O_prec"  )]
-    
-    mydata_id <- NULL
-    for (id in unique(auxfile_i$UniqueID)){
-      auxfile_j <- auxfile_i[which(auxfile_i$UniqueID==id),]
-      
-      mydata.tmp <- mydata[which(mydata$POSIX.time>=auxfile_j$start.time & 
-                               mydata$POSIX.time<=auxfile_j$start.time+auxfile_j$duration),]
-      mydata.tmp$Etime <- as.numeric(mydata.tmp$POSIX.time) - min(as.numeric(mydata.tmp$POSIX.time))
-      mydata.tmp$UniqueID <- auxfile_j$UniqueID
-      
-      mydata_id <- rbind(mydata_id, mydata.tmp)
-      rm(mydata)
-    }
-    
-  }
-  
-  return(mydata)
-}
-
 # discard all incubations where errors in fieldsheets have been detected
 
 table_draws <- table_draws[!table_draws$UniqueID %in% list_different,]
 
 
 CO2_flux.auto <- CH4_flux.auto <- CO2_flux.man <- CH4_flux.man <- CH4_diff_flux.man <- df.no_measurements <- NULL
-list_ids <- unique(table_draws$UniqueID)
+list_ids <- sort(unique(table_draws$UniqueID))
 for (k in seq_along(list_ids)){
   i = list_ids[k]
   message(paste0("processing ",i))
@@ -275,10 +234,10 @@ for (k in seq_along(list_ids)){
       
       # message("... calculate CO2 flux with aquaGHG, no manual selection")
       CO2_flux.auto_i <- automaticflux(dataframe = mydata, myauxfile = auxfile_i, shoulder = 0, gastype = "CO2dry_ppm", 
-                                       fluxSeparation = FALSE, displayPlots = FALSE, method = "trust.it.all")
+                                       fluxSeparation = FALSE, displayPlots = TRUE, method = "trust.it.all")
       # message("... calculate CH4 flux with aquaGHG, no manual selection")
       CH4_flux.auto_i <- automaticflux(dataframe = mydata, myauxfile = auxfile_i, shoulder = 0, gastype = "CH4dry_ppb", 
-                                       fluxSeparation = T, displayPlots = FALSE, method = "trust.it.all")
+                                       fluxSeparation = T, displayPlots = T, method = "trust.it.all")
       
       CO2_flux.auto <- rbind(CO2_flux.auto, CO2_flux.auto_i)
       CH4_flux.auto <- rbind(CH4_flux.auto, CH4_flux.auto_i)

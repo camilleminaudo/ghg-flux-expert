@@ -21,19 +21,19 @@
 rm(list = ls()) # clear workspace
 cat("/014") # clear console
 
+load_preprocessed <- T
 
 # ---- Directories ----
 
 # You have to make sure this is pointing to the write folder on your local machine
 dropbox_root <- "C:/Users/Camille Minaudo/Dropbox/RESTORE4Cs - Fieldwork/Data" 
 
-
 datapath <- paste0(dropbox_root,"/GHG/RAW data")
 loggerspath <- paste0(datapath,"/RAW Data Logger")
 RData_path <- paste0("C:/Users/Camille Minaudo/OneDrive - Universitat de Barcelona/Documentos/PROJECTS/RESTORE4Cs/data/Harmonized_GHG")
 # plots_path <- "C:/Users/Camille Minaudo/OneDrive - Universitat de Barcelona/Documentos/meetings_presentations/2024_PPNW_Girona"
-plots_path <- paste0(dropbox_root,"/GHG/GHG_expert_vs_automated/plots/")
-results_path <- paste0(dropbox_root,"/GHG/GHG_expert_vs_automated/results/")
+plots_path <- "C:/Users/Camille Minaudo/OneDrive - Universitat de Barcelona/Documentos/PROJECTS/RESTORE4Cs/GHG_expert_vs_automated/plots/"
+results_path <- "C:/Users/Camille Minaudo/OneDrive - Universitat de Barcelona/Documentos/PROJECTS/RESTORE4Cs/GHG_expert_vs_automated/results"
 
 
 # ---- packages ----
@@ -222,115 +222,206 @@ get_stats_incubs <- function(mylist){
 }
 
 
+
+plot_incubations_slcts <- function(list_ids, var){
+  mydata_sel <- load_this(mylist = list_ids)
+  table_draws_sel <- table_draws[which(table_draws$UniqueID%in%list_ids),]
+  if(var == "CO2dry_ppm"){
+    table_draws_sel$Etime_start <- table_draws_sel$start.time_expert_co2-(table_draws_sel$start.time_auto)
+    table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_co2-(table_draws_sel$start.time_auto)
+  } else {
+    table_draws_sel$Etime_start <- table_draws_sel$start.time_expert_ch4-(table_draws_sel$start.time_auto)
+    table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_ch4-(table_draws_sel$start.time_auto) 
+  }
+  
+  n_users <- length(unique(table_draws_sel$userID))
+  n_assess <- length(unique(table_draws_sel$uniqAssessID))
+  
+  table_draws_sel$ymins <- NA
+  # for (i in seq(1, length(table_draws_sel$uniqAssessID))){
+  #   table_draws_sel$ymins[i] <- mean(mydata_sel[[var]][which(mydata_sel$Etime > table_draws_sel$Etime_start[i] & mydata_sel$Etime < table_draws_sel$Etime_stop[i])], na.rm = T)
+  # }
+  # delta <- (max(mydata_sel[[var]]) - min(mydata_sel[[var]]))/n_assess/4
+  
+  table_draws_sel$ymins <- table_draws_sel$delta <- NA
+  
+  for(id in unique(table_draws_sel$UniqueID)){
+    
+    n_assess_id <- length(unique(table_draws_sel$uniqAssessID[table_draws_sel$UniqueID==id]))
+    
+    range_y <- range(mydata_sel[[var]][mydata_sel$UniqueID==id])
+    ymins_vect <- seq(range_y[1],range_y[2], length.out = length(unique(table_draws_sel$uniqAssessID[table_draws_sel$UniqueID==id])))
+    
+    table_draws_sel$ymins[table_draws_sel$UniqueID==id] <- ymins_vect
+    
+    table_draws_sel$delta <- 0.5*(range_y[2]-range_y[1])/n_assess_id
+    
+  }
+  
+  
+  
+  table_draws_sel$label <- paste0("ID = ",table_draws_sel$draw_corrected)
+  mydata_sel$label <- table_draws_sel$label[match(mydata_sel$UniqueID, table_draws_sel$UniqueID)]
+  
+  plt_bottom <- ggplot()+
+    geom_vline(data = table_draws_sel, aes(xintercept=Etime_start, group = UniqueID, colour = userID), alpha=0.3, size=1)+
+    geom_vline(data = table_draws_sel, aes(xintercept=Etime_stop, group = UniqueID, colour = userID), alpha=0.3, size=1)+
+    geom_segment(data = table_draws_sel, aes(x = Etime_start, xend= Etime_stop, y = userID, colour = userID), alpha=0.9, size=4)+
+    theme_article()+
+    xlab("Elapsed time [secs]")+
+    ylab("")+
+    scale_color_brewer(palette = "Dark2")
+  if (length(unique(table_draws_sel$UniqueID))>1){
+    plt_bottom <- plt_bottom+
+      facet_wrap(label~., scales = "free_x")
+  }
+  
+  
+  
+  if(var == "CO2dry_ppm"){
+    
+    plt_top <- ggplot()+
+      geom_vline(data = table_draws_sel, aes(xintercept=Etime_start, group = UniqueID, colour = userID), alpha=0.3, size=1)+
+      geom_vline(data = table_draws_sel, aes(xintercept=Etime_stop, group = UniqueID, colour = userID), alpha=0.3, size=1)+
+      # geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
+      #                                       ymin = ymins-delta, ymax = ymins+delta, fill=userID), alpha=0.2)+
+      geom_path(data = mydata_sel, aes(as.numeric(Etime), CO2dry_ppm, group = UniqueID))+
+      theme_article()+
+      xlab("Elapsed time [secs]")+
+      ylab(expression(""*CO[2~~dry]~" [ppm]"))+
+      scale_color_brewer(palette = "Dark2")
+    
+    if (length(unique(table_draws_sel$UniqueID))>1){
+      plt_top <- plt_top +
+        facet_wrap(label~., scales = "free_x")
+    }
+    
+    
+    
+  } else {
+    
+    plt_top <- ggplot()+
+      geom_vline(data = table_draws_sel, aes(xintercept=Etime_start, group = UniqueID, colour = userID), alpha=0.3, size=1)+
+      geom_vline(data = table_draws_sel, aes(xintercept=Etime_stop, group = UniqueID, colour = userID), alpha=0.3, size=1)+
+      # geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
+      #                                       ymin = ymins-delta, ymax = ymins+delta, fill=userID), alpha=0.2)+
+      geom_path(data = mydata_sel, aes(as.numeric(Etime), CH4dry_ppb, group = UniqueID))+
+      theme_article()+
+      xlab("Elapsed time [secs]")+
+      ylab(expression(""*CH[4~~dry]~" [ppb]"))+
+      scale_color_brewer(palette = "Dark2")
+    
+    if (length(unique(table_draws_sel$UniqueID))>1){
+      plt_top <- plt_top +
+        facet_wrap(label~., scales = "free_x")
+    }
+    
+  }
+  
+  myplt <- ggarrange(plt_top, plt_bottom, align = "hv", ncol = 1, heights = c(0.6,0.4), legend = "none", labels = c("a","b"))
+ 
+  return(myplt)
+}
+
 # ---- Loading data ----
 
-
-# loading auxfile
 setwd(dirname(results_path))
-auxfile <- read.csv(file = "auxfile.csv")
-auxfile$start.time <- as.POSIXct(auxfile$start.time, tz = 'UTC') 
 
-load("results/results_ghg_experts_recalculated.Rdata")
-
-
-
-# load_fs <- function(path, pattern){
-#   
-#   list_f <- list.files(path = path, pattern = pattern, full.names = T)
-#   list_f <- list_f[grep(pattern = "csv", x = list_f)]
-#   
-#   isF <- T
-#   for (f in list_f){
-#     df_tmp <- read.csv(f)
-#     if(isF){
-#       isF <- F
-#       df_out <- df_tmp
-#     } else {
-#       df_out <- rbind(df_out,df_tmp)
-#     }
-#   }
-#   return(df_out)
-# }
-# 
-# table_all <- load_fs(path = results_path, pattern = "BLIND_vs_EXPERT_co2_ch4_fluxes_")
-# table_ebull <- load_fs(path = results_path, pattern = "ch4_ebullition")
-# table_ebull$ebullition[which(table_ebull$ebullition>table_ebull$total_estimated)] <- table_ebull$total_estimated[which(table_ebull$ebullition>table_ebull$total_estimated)]
-# table_ebull$ebullition[which(table_ebull$ebullition < 0)] <- 0
-# table_draws <- load_fs(path = results_path, pattern = "table_draw")
-# 
-# 
-# 
-# # clean names
-# table_all <- table_all %>%
-#   mutate(username = str_replace_all(username, fixed("Camille Minaudo"), "Camille"),
-#          username = str_replace_all(username, fixed("Dmorant"), "DMorant"),
-#          username = str_replace_all(username, fixed("Jorge Montes"), "Jorge"),
-#          username = str_replace_all(username, fixed("Katrin Attermeyer"), "Katrin"),
-#          username = str_replace_all(username, fixed("Miguel Cabrera"), "Miguel"))
-# 
-# table_ebull <- table_ebull %>%
-#   mutate(username = str_replace_all(username, fixed("Camille Minaudo"), "Camille"),
-#          username = str_replace_all(username, fixed("Dmorant"), "DMorant"),
-#          username = str_replace_all(username, fixed("Jorge Montes"), "Jorge"),
-#          username = str_replace_all(username, fixed("Katrin Attermeyer"), "Katrin"),
-#          username = str_replace_all(username, fixed("Miguel Cabrera"), "Miguel"))
-# 
-# table_draws <- table_draws %>%
-#   mutate(username = str_replace_all(username, fixed("Camille Minaudo"), "Camille"),
-#          username = str_replace_all(username, fixed("Dmorant"), "DMorant"),
-#          username = str_replace_all(username, fixed("Jorge Montes"), "Jorge"),
-#          username = str_replace_all(username, fixed("Katrin Attermeyer"), "Katrin"),
-#          username = str_replace_all(username, fixed("Miguel Cabrera"), "Miguel"))
-
-
-# statistics on all incubations
-stats_all <- get_stats_incubs(mylist = unique(table_draws$UniqueID))
-names(stats_all)
-
-stats_all$flux_co2 <- CO2_flux.auto$best.flux[match(stats_all$UniqueID, CO2_flux.auto$UniqueID)]
-stats_all$flux_ch4 <- CH4_flux.auto$best.flux[match(stats_all$UniqueID, CH4_flux.auto$UniqueID)]
-stats_all$ebull_ch4 <- CH4_flux.auto$ebullition.flux[match(stats_all$UniqueID, CH4_flux.auto$UniqueID)]
-stats_all$diffus_ch4 <- CH4_diff_flux.man$best.flux[match(stats_all$UniqueID, CH4_diff_flux.man$UniqueID)]
-
-
-# ---- Retrieve timestamp processing for table_draw and making unique IDs ----
-
-# this was done in recalculate_fluxes_with_aquaGHG.R
+if (load_preprocessed){
+  load("results/results_ghg_experts_preprocessed.Rdata")
+} else {
+  
+  
+  # loading auxfile
+  auxfile <- read.csv(file = "auxfile.csv")
+  auxfile$start.time <- as.POSIXct(auxfile$start.time, tz = 'UTC') 
+  
+  load("results/results_ghg_experts_recalculated.Rdata")
+  
+  
+  
+  # load_fs <- function(path, pattern){
+  #   
+  #   list_f <- list.files(path = path, pattern = pattern, full.names = T)
+  #   list_f <- list_f[grep(pattern = "csv", x = list_f)]
+  #   
+  #   isF <- T
+  #   for (f in list_f){
+  #     df_tmp <- read.csv(f)
+  #     if(isF){
+  #       isF <- F
+  #       df_out <- df_tmp
+  #     } else {
+  #       df_out <- rbind(df_out,df_tmp)
+  #     }
+  #   }
+  #   return(df_out)
+  # }
+  # 
+  # table_all <- load_fs(path = results_path, pattern = "BLIND_vs_EXPERT_co2_ch4_fluxes_")
+  # table_ebull <- load_fs(path = results_path, pattern = "ch4_ebullition")
+  # table_ebull$ebullition[which(table_ebull$ebullition>table_ebull$total_estimated)] <- table_ebull$total_estimated[which(table_ebull$ebullition>table_ebull$total_estimated)]
+  # table_ebull$ebullition[which(table_ebull$ebullition < 0)] <- 0
+  # table_draws <- load_fs(path = results_path, pattern = "table_draw")
+  # 
+  # 
+  # 
+  # # clean names
+  # table_all <- table_all %>%
+  #   mutate(username = str_replace_all(username, fixed("Camille Minaudo"), "Camille"),
+  #          username = str_replace_all(username, fixed("Dmorant"), "DMorant"),
+  #          username = str_replace_all(username, fixed("Jorge Montes"), "Jorge"),
+  #          username = str_replace_all(username, fixed("Katrin Attermeyer"), "Katrin"),
+  #          username = str_replace_all(username, fixed("Miguel Cabrera"), "Miguel"))
+  # 
+  # table_ebull <- table_ebull %>%
+  #   mutate(username = str_replace_all(username, fixed("Camille Minaudo"), "Camille"),
+  #          username = str_replace_all(username, fixed("Dmorant"), "DMorant"),
+  #          username = str_replace_all(username, fixed("Jorge Montes"), "Jorge"),
+  #          username = str_replace_all(username, fixed("Katrin Attermeyer"), "Katrin"),
+  #          username = str_replace_all(username, fixed("Miguel Cabrera"), "Miguel"))
+  # 
+  # table_draws <- table_draws %>%
+  #   mutate(username = str_replace_all(username, fixed("Camille Minaudo"), "Camille"),
+  #          username = str_replace_all(username, fixed("Dmorant"), "DMorant"),
+  #          username = str_replace_all(username, fixed("Jorge Montes"), "Jorge"),
+  #          username = str_replace_all(username, fixed("Katrin Attermeyer"), "Katrin"),
+  #          username = str_replace_all(username, fixed("Miguel Cabrera"), "Miguel"))
+  
+  
+  # statistics on all incubations
+  stats_all <- get_stats_incubs(mylist = unique(table_draws$UniqueID))
+  names(stats_all)
+  
+  stats_all$flux_co2 <- CO2_flux.auto$best.flux[match(stats_all$UniqueID, CO2_flux.auto$UniqueID)]
+  stats_all$flux_ch4 <- CH4_flux.auto$best.flux[match(stats_all$UniqueID, CH4_flux.auto$UniqueID)]
+  stats_all$ebull_ch4 <- CH4_flux.auto$ebullition.flux[match(stats_all$UniqueID, CH4_flux.auto$UniqueID)]
+  stats_all$diffus_ch4 <- CH4_diff_flux.man$best.flux[match(stats_all$UniqueID, CH4_diff_flux.man$UniqueID)]
+  
+  
+  # ---- Retrieve timestamp processing for table_draw and making unique IDs ----
+  
+  # this was done in recalculate_fluxes_with_aquaGHG.R
+  
+  
+  save.image(file = "results/results_ghg_experts_preprocessed.Rdata")
+  
+}
 
 
 
 # ---- overview database ----
 
-message("contributions by experts")
-table(table_draws$username)
+message("overview of in-situ database")
 
-tab_users <- as.data.frame(table(table_draws$username))
-tab_users$userID <- paste0("user",seq(1,dim(tab_users)[1]))
+p_duration <- ggplot(auxfile, aes(duration))+geom_density(alpha=0.5)+
+  xlab("Duration [secs]")+
+  # ylab("Water depth [cm]")+
+  theme_article()
 
-tab_users$userID <- factor(x = tab_users$userID, levels = tab_users$userID[order(tab_users$Freq, decreasing = T)])
-
-table_draws$userID <- tab_users$userID[match(table_draws$username, tab_users$Var1)]
-
-p_users <- ggplot(tab_users, aes(userID, Freq))+geom_point()+theme_article()+
-  ggtitle(paste0("n = ",dim(tab_users)[1]))+
-  xlab("User ID")+ylab("Counts")+coord_flip()
-
-p_users
-
-
-
-n <- length(unique(table_draws$UniqueID))
-table_n <- data.frame(id = names(table(table_draws$UniqueID)),
-                      n = as.numeric(table(table_draws$UniqueID)))
-
-
-p_overview <- ggplot(table_n, aes(n))+geom_histogram()+theme_article()+xlab("Repetitions")+ylab("Counts")+
-  ggtitle(paste0("n = ",n))+
-  scale_x_continuous(breaks = breaks_pretty())
-
-p_overview
-
-
+p_depth <- ggplot(auxfile, aes(water_depth))+geom_density(alpha=0.5)+
+  xlab("Water depth [cm]")+
+  theme_article()
 
 
 p_mean_sd_co2 <- ggplot(stats_all, aes(mean_co2, sd_co2))+geom_point(alpha=0.5)+
@@ -350,39 +441,121 @@ p_mean_sd_ch4 <- ggplot(stats_all, aes(mean_ch4, sd_ch4))+geom_point(alpha=0.5)+
 p_dist_co2 <- ggMarginal(p_mean_sd_co2, type="density")
 p_dist_ch4 <- ggMarginal(p_mean_sd_ch4, type="density")
 
-p_overview_dist <- ggpubr::ggarrange(p_users, p_overview, p_dist_co2, p_dist_ch4, ncol = 2, nrow = 2)
-p_overview_dist
+p_overview_db <- ggpubr::ggarrange(p_duration, p_depth, p_dist_co2, p_dist_ch4, ncol = 2, nrow = 2,labels = c("a","b","c","d"))
+p_overview_db
 
-ggsave(plot = p_overview_dist, filename = "overview_database_ghg_expert.jpeg", path = plots_path, 
-       width = 6, height = 6, dpi = 300, units = 'in', scale = 1.0)
-
-
+# ggsave(plot = p_overview_db, filename = "Fig1_overview_database_ghg_expert.jpeg", path = plots_path, 
+#        width = 6, height = 6, dpi = 300, units = 'in', scale = 1.0)
 
 
-p_co2_ch4_fluxes <- ggplot(stats_all, aes(flux_co2, flux_ch4))+geom_point(alpha=0.5)+
-  # xlab("Average CO2 [ppm]")+
-  # ylab("Standard deviation CO2 [ppm]")+
-  scale_x_log10()+
-  scale_y_log10()+
-  theme_article()
-ggMarginal(p_co2_ch4_fluxes, type="density")
 
 
-ggplot(stats_all, aes(as.factor(n_bubbles), ebull_ch4))+geom_boxplot(alpha=0.5)+
-  # xlab("Average CO2 [ppm]")+
-  # ylab("Standard deviation CO2 [ppm]")+
-  # scale_x_log10()+
-  scale_y_log10()+
-  theme_article()
+message("contributions by experts")
+table(table_draws$username)
+
+tab_users <- as.data.frame(table(table_draws$username))
+tab_users$userID <- paste0("user",seq(1,dim(tab_users)[1]))
+
+tab_users$userID <- factor(x = tab_users$userID, levels = tab_users$userID[order(tab_users$Freq, decreasing = T)])
+
+table_draws$userID <- tab_users$userID[match(table_draws$username, tab_users$Var1)]
+
+p_users <- ggplot(tab_users, aes(userID, Freq))+geom_point()+theme_article()+
+  # ggtitle(paste0("n (users) = ",dim(tab_users)[1]))+
+  xlab("User ID")+
+  ylab("Number of incubations")+theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))
+
+p_users
+
+
+
+n <- length(unique(table_draws$UniqueID))
+n_inspections <- dim(table_draws)[1]
+table_n <- data.frame(id = names(table(table_draws$UniqueID)),
+                      n = as.numeric(table(table_draws$UniqueID)))
+
+
+p_overview <- ggplot(table_n, aes(n))+geom_histogram()+theme_article()+xlab("Repetitions")+ylab("Number of incubations")+
+  # ggtitle(paste0("n (unique incubations) = ",n, ", n (inspections) = ",n_inspections))+
+  scale_x_continuous(breaks = breaks_pretty())
+p_overview
+
+
+
+table_n <- data.frame(id = names(table(table_draws$UniqueID)),
+                      n = as.numeric(table(table_draws$UniqueID)),
+                      key = "by_incubation")
+
+
+table_n_userID <- data.frame(id = names(table(paste(table_draws$draw,table_draws$userID,sep = "-"))),
+                             n = as.numeric(table(paste(table_draws$draw,table_draws$userID,sep = "-"))),
+                             key = "by_user")
+
+
+table_n_both <- rbind(table_n, table_n_userID)
+
+
+p_overview_userID <- ggplot(table_n_both, aes(n, fill = key))+
+  geom_histogram(position = "jitter")+theme_article()+xlab("Repetitions")+ylab("Number of incubations")+
+  scale_x_continuous(breaks = breaks_pretty())
+p_overview_userID
+
+
+
+length(which(table_n_userID$n>1))
+
+table_multiple_assess_by_user <- table_n_userID[which(table_n_userID$n==2),]
+
+find_dash <- table_multiple_assess_by_user$id %>% str_locate_all("-") %>% sapply(., function(x) x[,2])
+
+length(unique(str_sub(table_multiple_assess_by_user$id, start = 1, end = find_dash-1)))
+
+
+p_overview_contribs <- ggpubr::ggarrange(p_users, p_overview, ncol = 2, nrow = 1, align = "h",labels = c("a","b"))
+p_overview_contribs
+ggsave(plot = p_overview_contribs, filename = "Fig1_overview_contributions_ghg_expert.jpeg", path = plots_path,
+       width = 6, height = 3, dpi = 300, units = 'in', scale = 1.2)
+
+
+# example of experts' selection
+table_draws$duration_ratio_co2 <- table_draws$duration_expert_co2/(table_draws$end.time_auto - table_draws$start.time_auto) 
+table_draws$duration_ratio_ch4 <- table_draws$duration_expert_ch4/(table_draws$end.time_auto - table_draws$start.time_auto) 
+
+# table(table_draws$UniqueID[table_draws$duration_ratio_co2<.5])
+# list_ids <- names(table(table_draws$UniqueID[table_draws$duration_ratio_co2<.5])[which(table(table_draws$UniqueID[table_draws$duration_ratio_co2<.5])>5)])
+
+
+list_ids <- names(table(table_draws$UniqueID[table_draws$duration_ratio_co2>.8])[which(table(table_draws$UniqueID[table_draws$duration_ratio_co2>.8])>5)])
+
+
+
+# selected incubations for draft
+# list_ids <- c("s1-cu-a2-16-o-d-11:58","s3-va-a1-4-o-d-10:04")
+list_ids <- "s3-va-a1-4-o-d-10:04"
+p_exemple_co2 <- plot_incubations_slcts(list_ids = list_ids[6:10], var = "CO2dry_ppm")
+p_exemple_co2
+
+ggsave(plot = p_exemple_co2, filename = "Fig2_exemple_CO2_selection_experts.jpeg", path = plots_path, 
+       width = 4, height = 5, dpi = 300, units = 'in', scale = 1.0)
+
+
+p_exemple_ch4 <- plot_incubations_slcts(list_ids = list_ids, var = "CH4dry_ppb")
+p_exemple_ch4
+
+ggsave(plot = p_exemple_ch4, filename = "FigS1_exemple_CH4_selection_experts.jpeg", path = plots_path, 
+       width = 4, height = 5, dpi = 300, units = 'in', scale = 1.0)
+
+
+
 
 
 
 # ---- Flagged anomalous ----
 
-sewd(results_path)
+setwd(results_path)
 load("table_draws_fixed.RData")
 
-threshold_anomalous <- 30 # seconds or n observations
+threshold_anomalous <- 10 # seconds or n observations
 
 ggplot(table_draws_all_fixed, aes(duration_expert_co2 ))+
   geom_histogram(alpha=0.5)+theme_article()+geom_vline(xintercept = threshold_anomalous)
@@ -391,6 +564,93 @@ ggplot(table_draws_all_fixed, aes(duration_expert_ch4))+
 
 # table_all$uniqAssessID <- paste(table_all$timestamp_processing, table_all$UniqueID, sep="/")
 # table_ebull$uniqAssessID <- paste(table_ebull$timestamp_processing, table_ebull$UniqueID, sep="/")
+
+table_flagged_co2 <- data.frame(variable = "CO2",
+                                uniqAssessID = unique(table_draws_all_fixed$uniqAssessID[which(
+                                  table_draws_all_fixed$duration_expert_co2 < threshold_anomalous)]))
+table_flagged_co2$UniqueID <- table_draws_all_fixed$UniqueID[match(table_flagged_co2$uniqAssessID, table_draws_all_fixed$uniqAssessID)]
+
+table_flagged_co2$n_assessed <- table_flagged_co2$n_flagged <- NA
+for(i in seq(1,length(table_flagged_co2$uniqAssessID))){
+  table_flagged_co2$n_assessed[i] <- length(which(table_draws_all_fixed$UniqueID==table_flagged_co2$UniqueID[i]))
+  table_flagged_co2$n_flagged[i] <- length(which(table_flagged_co2$UniqueID==table_flagged_co2$UniqueID[i]))
+}
+table_flagged_co2$flagged_rate <- table_flagged_co2$n_flagged/table_flagged_co2$n_assessed
+
+
+table_flagged_ch4 <- data.frame(variable = "CH4",
+                                uniqAssessID = unique(table_draws_all_fixed$uniqAssessID[which(
+                                  table_draws_all_fixed$duration_expert_ch4 < threshold_anomalous)]))
+table_flagged_ch4$UniqueID <- table_draws_all_fixed$UniqueID[match(table_flagged_ch4$uniqAssessID, table_draws_all_fixed$uniqAssessID)]
+
+table_flagged_ch4$n_assessed <- table_flagged_ch4$n_flagged <- NA
+for(i in seq(1,length(table_flagged_ch4$uniqAssessID))){
+  table_flagged_ch4$n_assessed[i] <- length(which(table_draws_all_fixed$UniqueID==table_flagged_ch4$UniqueID[i]))
+  table_flagged_ch4$n_flagged[i] <- length(which(table_flagged_ch4$UniqueID==table_flagged_ch4$UniqueID[i]))
+}
+table_flagged_ch4$flagged_rate <- table_flagged_ch4$n_flagged/table_flagged_ch4$n_assessed
+
+
+table_flagged <- rbind(table_flagged_co2, table_flagged_ch4)
+
+table_flagged_nassessed_more_than_3 <- table_flagged[which(table_flagged$n_assessed>=3),]
+
+which(table_flagged_nassessed_more_than_3$flagged_rate==1)
+
+
+# identify incubations flagged for both CO2 and CH4
+list_both <- table_flagged$UniqueID[duplicated(paste0(table_flagged$variable, table_flagged$UniqueID))]
+
+tab_flagged_plt <- table_flagged#[!duplicated(table_flagged$UniqueID),]
+tab_flagged_plt$variable[tab_flagged_plt$UniqueID %in% list_both] <- "CO2 and CH4"
+
+
+# ggplot(tab_flagged_plt, 
+#        aes(n_assessed, flagged_rate, colour = variable))+geom_jitter()+
+#   xlab("n")+ylab("Flagging rate")+
+#   theme_article()+
+#   ylim(c(0,1))+
+#   scale_colour_viridis_d(begin = 0.2, end = .9, option = "A", direction = -1)+
+#   theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))+
+#   scale_x_continuous(breaks = breaks_pretty())
+
+
+plt_flaggingRate <- ggplot(tab_flagged_plt,
+                           aes(as.factor(n_assessed), flagged_rate, colour = variable))+geom_jitter(alpha = 0.9, size=3)+
+  xlab("Counts of incubation assessment")+
+  ylab("Flagging rate")+
+  theme_article()+
+  ylim(c(0,1))+
+  scale_colour_viridis_d(begin = 0.2, end = .9, option = "A", direction = -1)
+
+
+ggplot(tab_flagged_plt)+
+  # geom_point(aes(reorder(UniqueID, flagged_rate), n_assessed))+
+  geom_point(aes(reorder(UniqueID, n_assessed), n_flagged))+
+  # coord_flip()+
+  # xlab("Incubation ID")+ylab("Flagging rate")+
+  theme_article()+
+  ylim(c(0,10))+
+  scale_colour_viridis_d(begin = 0.2, end = .9, option = "A", direction = -1)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))#+facet_grid(.~variable, scales = "free_x")
+
+
+ggsave(plot = plt_flaggingRate, filename = "flaggingRate.jpeg", path = plots_path,
+       width = 6, height = 4, dpi = 300, units = 'in', scale = 1)
+
+
+
+tab_flagged_plt[which(tab_flagged_plt$UniqueID=="s4-da-a2-10-o-d-08:29"),]
+
+
+
+
+
+ggplot(table_flagged[duplicated(table_flagged$UniqueID),], #http://127.0.0.1:18381/graphics/74e43cbf-6549-4826-8127-6bcf615f7086.png
+       aes(n_assessed, flagged_rate, colour = variable))+geom_jitter(size=3)+theme_article()+
+  xlab("n(assessed)")+ylab("Flagged rate")+
+  scale_x_continuous(breaks = breaks_pretty())
+
 
 tmpstmp_flag_co2 <- unique(table_draws_all_fixed$uniqAssessID[which(table_draws_all_fixed$duration_expert_co2 < threshold_anomalous)])
 tmpstmp_flag_ch4 <- unique(table_draws_all_fixed$uniqAssessID[which(table_draws_all_fixed$duration_expert_ch4 < threshold_anomalous)])
@@ -432,11 +692,264 @@ p_mean_sd_ch4_f <- ggplot(stats_all, aes(mean_ch4, sd_ch4, colour = ch4flagged))
   theme(legend.title = element_blank())+ggtitle(paste0("n flagged = ", length(incubs_flagged_ch4)))
 
 # p_dist_co2 <- ggMarginal(p_mean_sd_co2, type="density", groupFill = T)
-p_flagged <- ggpubr::ggarrange(p_mean_sd_co2_f, p_mean_sd_ch4_f, common.legend = T, legend = "right")
+p_flagged <- ggpubr::ggarrange(p_users, p_overview, p_mean_sd_co2_f, p_mean_sd_ch4_f, common.legend = T, legend = "right")
 
 ggsave(plot = p_flagged, filename = "flagged.jpeg", path = plots_path,
-       width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+       width = 8, height = 6, dpi = 300, units = 'in', scale = 1.0)
 
+
+
+
+# plot incubations with the highest disagreements between experts
+list_ids <- tail(incubs_flagged_co2, 9)
+
+mydata_sel <- load_this(mylist = list_ids)
+
+p_flagged_CO2 <- ggplot()+
+  # geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
+  #                                       ymin = -Inf, ymax = Inf, fill=userID), alpha=0.2)+
+  geom_path(data = mydata_sel, aes(as.numeric(Etime), CO2dry_ppm, group = UniqueID))+
+  theme_article()+
+  xlab("Elapsed time [secs]")+
+  ylab("CO2_dry [ppm]")+
+  facet_wrap(UniqueID~., scales = "free")
+p_flagged_CO2
+ggsave(plot = p_flagged_CO2, filename = "examples_flagged_CO2.jpeg", path = plots_path, 
+       width = 8, height = 6, dpi = 300, units = 'in', scale = 1.0)
+
+
+plot_incubations_slcts(list_ids, var = "CO2dry_ppm")
+
+
+
+# ---- remove from the tables the incubations flagged as anomalous ----
+
+# first we remove from the tables the incubations flagged as anomalous
+table_draws <- table_draws[ ! table_draws$uniqAssessID %in% unique(table_flagged$uniqAssessID), ]
+
+
+
+
+# ---- How do expert trim time series? ----
+
+# ggplot(table_draws, aes(end.time_auto-end.time_expert_ch4))+geom_density()+theme_article()
+
+
+p_less_than_50perc_co2 <- length(which(table_draws$duration_ratio_co2 < .5))/dim(table_draws)[1]*100
+p_less_than_50perc_ch4 <- length(which(table_draws$duration_ratio_ch4 < .5))/dim(table_draws)[1]*100
+
+
+p_more_than_90perc_co2 <- length(which(table_draws$duration_ratio_co2 > .9))/dim(table_draws)[1]*100
+p_more_than_90perc_ch4 <- length(which(table_draws$duration_ratio_ch4 > .9))/dim(table_draws)[1]*100
+
+
+# how many trimmed time series start after half the original measurements?
+length(which((table_draws$start.time_expert_co2 - table_draws$start.time_auto) > ((table_draws$end.time_auto - table_draws$start.time_auto)/2)))/dim(table_draws)[1]*100
+length(which((table_draws$start.time_expert_ch4 - table_draws$start.time_auto) > ((table_draws$end.time_auto - table_draws$start.time_auto)/2)))/dim(table_draws)[1]*100
+
+
+p_density_duration <- ggplot(table_draws)+
+  geom_density(aes(duration_expert_co2/(end.time_auto - start.time_auto), fill="CO2"), color=alpha("black", 0.1), alpha=.5)+
+  geom_density(aes(duration_expert_ch4/(end.time_auto - start.time_auto), fill="CH4"), color=alpha("black", 0.1), alpha=.5)+
+  scale_fill_manual(values = c("#fc8d62", "#8da0cb"), name = "Variable")+
+  xlab(expression(duration[~expert~selection]~~"/ " * duration[~original~data]))+
+  theme_article()+theme(legend.position = c(0.2,0.8))
+p_density_duration
+
+
+
+
+row_blank <- seq(0,1,0.01)
+mymatco2 <- mymatch4 <- NULL
+table_draws$code_row_co2 <- table_draws$code_row_ch4 <- NA
+for(i in seq(1,dim(table_draws)[1])){
+  t_start_co2 <- (table_draws$start.time_expert_co2[i] - table_draws$start.time_auto[i])/(table_draws$end.time_auto[i] - table_draws$start.time_auto[i])
+  t_stop_co2 <- (table_draws$end.time_expert_co2[i] - table_draws$start.time_auto[i])/(table_draws$end.time_auto[i] - table_draws$start.time_auto[i])
+  
+  myrow <- 0*row_blank
+  myrow[which(row_blank>=t_start_co2 & row_blank<=t_stop_co2)] <- 3
+  code_row_co2 <- 3
+  if((t_stop_co2 - t_start_co2) < .5){myrow[which(row_blank>=t_start_co2 & row_blank<=t_stop_co2)] <- 2; code_row_co2 <- 2}
+  if(t_start_co2 > .5){myrow[which(row_blank>=t_start_co2 & row_blank<=t_stop_co2)] <- 4; code_row_co2 <- 4}
+  if(t_stop_co2 < .5){myrow[which(row_blank>=t_start_co2 & row_blank<=t_stop_co2)] <- 1; code_row_co2 <- 1}
+  
+  mymatco2 <- rbind(mymatco2,myrow)
+  table_draws$code_row_co2[i] <- code_row_co2
+  
+  
+  t_start_ch4 <- (table_draws$start.time_expert_ch4[i] - table_draws$start.time_auto[i])/(table_draws$end.time_auto[i] - table_draws$start.time_auto[i])
+  t_stop_ch4 <- (table_draws$end.time_expert_ch4[i] - table_draws$start.time_auto[i])/(table_draws$end.time_auto[i] - table_draws$start.time_auto[i])
+  
+  myrow <- 0*row_blank
+  myrow[which(row_blank>=t_start_ch4 & row_blank<=t_stop_ch4)] <- 3
+  code_row_ch4 <- 3
+  if((t_stop_ch4 - t_start_ch4) < .5){myrow[which(row_blank>=t_start_ch4 & row_blank<=t_stop_ch4)] <- 2; code_row_ch4 <- 2}
+  if(t_start_ch4 > .5){myrow[which(row_blank>=t_start_ch4 & row_blank<=t_stop_ch4)] <- 4; code_row_ch4 <- 4}
+  if(t_stop_ch4 < .5){myrow[which(row_blank>=t_start_ch4 & row_blank<=t_stop_ch4)] <- 1; code_row_ch4 <- 1}
+  
+  mymatch4 <- rbind(mymatch4,myrow)
+  table_draws$code_row_ch4[i] <- code_row_ch4
+}
+
+# image(t(mymatco2[order((table_draws$start.time_expert_co2 - table_draws$start.time_auto)/(table_draws$end.time_auto - table_draws$start.time_auto)),]),
+#       col=c("#DCDCDC", "#1b9e77"))
+
+# order by duration:
+# mymatco2_ord <- mymatco2[order((table_draws$end.time_expert_co2 - table_draws$start.time_expert_co2)/(table_draws$end.time_auto - table_draws$start.time_auto)),]
+
+# order by starting time
+# mymatco2_ord <- mymatco2[order(table_draws$code_row_co2, (table_draws$start.time_expert_co2-table_draws$start.time_auto)/(table_draws$end.time_auto-table_draws$start.time_auto)),]
+mymatco2_ord <- mymatco2[order((table_draws$start.time_expert_co2-table_draws$start.time_auto)/(table_draws$end.time_auto-table_draws$start.time_auto)),]
+
+rownames(mymatco2_ord) <- as.character(seq(1,dim(mymatco2)[1]))
+longData_co2<-reshape2::melt(mymatco2_ord)
+longData_co2$value_str <- "void"
+longData_co2$value_str[longData_co2$value==1] <- "1st half"
+longData_co2$value_str[longData_co2$value==2] <- "less than half"
+longData_co2$value_str[longData_co2$value==3] <- "more than half"
+longData_co2$value_str[longData_co2$value==4] <- "2nd half"
+
+longData_co2$value_str <- factor(x = longData_co2$value_str, levels = c("void","1st half","less than half","more than half","2nd half"))
+
+require(scales)
+p_mat_co2 <- ggplot(longData_co2[longData_co2$value>0,], aes(x = Var2/100, y = Var1)) +
+  geom_raster(aes(fill=as.factor(value_str)))+
+  scale_fill_manual(values = c("#e7298a","#fdbb84","#99d8c9","#7570b3"), name = "Experts' selection")+
+  xlab("Normalized incubation time")+
+  ylab(expression("Running ID of "*CO[2]~" time series"))+
+  # ggtitle("Experts' selection for CO2 incubations")+
+  theme_article() + theme(axis.text.x=element_text(size=9, angle=0, vjust=0.3),
+                     axis.text.y=element_text(size=9),
+                     plot.title=element_text(size=11),
+                     legend.position = 'bottom')
+
+
+
+# order by starting time
+# mymatch4_ord <- mymatch4[order(table_draws$code_row_ch4, (table_draws$start.time_expert_ch4-table_draws$start.time_auto)/(table_draws$end.time_auto-table_draws$start.time_auto)),]
+mymatch4_ord <- mymatch4[order((table_draws$start.time_expert_ch4-table_draws$start.time_auto)/(table_draws$end.time_auto-table_draws$start.time_auto)),]
+
+rownames(mymatch4_ord) <- as.character(seq(1,dim(mymatch4)[1]))
+longData_ch4<-reshape2::melt(mymatch4_ord)
+longData_ch4$value_str <- "void"
+longData_ch4$value_str[longData_ch4$value==1] <- "1st half"
+longData_ch4$value_str[longData_ch4$value==2] <- "less than half"
+longData_ch4$value_str[longData_ch4$value==3] <- "more than half"
+longData_ch4$value_str[longData_ch4$value==4] <- "2nd half"
+
+longData_ch4$value_str <- factor(x = longData_ch4$value_str, levels = c("void","1st half","less than half","more than half","2nd half"))
+
+p_mat_ch4 <- ggplot(longData_ch4[longData_ch4$value>0,], aes(x = Var2/100, y = Var1)) +
+  geom_raster(aes(fill=as.factor(value_str)))+
+  scale_fill_manual(values = c("#e7298a","#fdbb84","#99d8c9","#7570b3"), name = "Experts' selection")+
+  xlab("Normalized incubation time")+
+  ylab(expression("Running ID of "*CH[4]~" time series"))+
+  # ggtitle("Experts' selection for ch4 incubations")+
+  theme_article() + theme(axis.text.x=element_text(size=9, angle=0, vjust=0.3),
+                          axis.text.y=element_text(size=9),
+                          plot.title=element_text(size=11),
+                          legend.position = 'bottom')
+
+
+
+table_draws$code_row_co2_str <- "void"
+table_draws$code_row_co2_str[table_draws$code_row_co2==1] <- "1st half"
+table_draws$code_row_co2_str[table_draws$code_row_co2==2] <- "less than half"
+table_draws$code_row_co2_str[table_draws$code_row_co2==3] <- "more than half"
+table_draws$code_row_co2_str[table_draws$code_row_co2==4] <- "2nd half"
+table_draws$code_row_co2_str <- factor(x = table_draws$code_row_co2_str, levels = c("void","1st half","less than half","2nd half","more than half"))
+
+table_draws$code_row_co2_str_glob <- "more than half"
+table_draws$code_row_co2_str_glob[table_draws$code_row_co2!=3] <- "less than half"
+
+p_repartition_co2 <- ggplot(table_draws, aes(code_row_co2_str_glob, fill = as.factor(code_row_co2_str)))+geom_bar()+
+  scale_fill_manual(values = c("#e7298a","#fdbb84","#7570b3","#99d8c9"), name = "Experts' selection")+
+  xlab(expression("Selected span for "*CO[2]))+
+  ylab("Time series count")+
+  theme_article() + theme(axis.text.x=element_text(size=9, angle=0, vjust=0.3),
+                          axis.text.y=element_text(size=9),
+                          plot.title=element_text(size=11),
+                          legend.position = 'none',
+                          legend.title = element_blank())
+
+
+
+
+table_draws$code_row_ch4_str <- "void"
+table_draws$code_row_ch4_str[table_draws$code_row_ch4==1] <- "1st half"
+table_draws$code_row_ch4_str[table_draws$code_row_ch4==2] <- "less than half"
+table_draws$code_row_ch4_str[table_draws$code_row_ch4==3] <- "more than half"
+table_draws$code_row_ch4_str[table_draws$code_row_ch4==4] <- "2nd half"
+table_draws$code_row_ch4_str <- factor(x = table_draws$code_row_ch4_str, levels = c("void","1st half","less than half","2nd half","more than half"))
+
+table_draws$code_row_ch4_str_glob <- "more than half"
+table_draws$code_row_ch4_str_glob[table_draws$code_row_ch4!=3] <- "less than half"
+
+p_repartition_ch4 <- ggplot(table_draws, aes(code_row_ch4_str_glob, fill = as.factor(code_row_ch4_str)))+geom_bar()+
+  scale_fill_manual(values = c("#e7298a","#fdbb84","#7570b3","#99d8c9"), name = "Experts' selection")+
+  xlab(expression("Selected span for "*CH[4]))+
+  ylab("Time series count")+
+  theme_article() + theme(axis.text.x=element_text(size=9, angle=0, vjust=0.3),
+                          axis.text.y=element_text(size=9),
+                          plot.title=element_text(size=11),
+                          legend.position = 'none',
+                          legend.title = element_blank())
+
+
+p_duration_co2 <- ggplot(table_draws, aes(code_row_co2_str_glob, duration_expert_co2, fill = as.factor(code_row_co2_str)))+geom_boxplot()+
+  scale_fill_manual(values = c("#e7298a","#fdbb84","#7570b3","#99d8c9"), name = "experts'selection")+
+  xlab(expression("Selected span for "*CO[2]))+
+  ylab("Duration of selection [secs]")+
+  theme_article() + theme(axis.text.x=element_text(size=9, angle=0, vjust=0.3),
+                          axis.text.y=element_text(size=9),
+                          plot.title=element_text(size=11),
+                          legend.position = 'none',
+                          legend.title = element_blank())
+
+p_duration_ch4 <- ggplot(table_draws, aes(code_row_ch4_str_glob, duration_expert_ch4, fill = as.factor(code_row_ch4_str)))+geom_boxplot()+
+  scale_fill_manual(values = c("#e7298a","#fdbb84","#7570b3","#99d8c9"), name = "experts'selection")+
+  xlab(expression("Selected span for "*CH[4]))+
+  ylab("Duration of selection [secs]")+
+  theme_article() + theme(axis.text.x=element_text(size=9, angle=0, vjust=0.3),
+                          axis.text.y=element_text(size=9),
+                          plot.title=element_text(size=11),
+                          legend.position = 'none',
+                          legend.title = element_blank())
+
+p_mat_exprts_selections <- ggpubr::ggarrange(p_mat_co2, p_mat_ch4, ggpubr::ggarrange(p_repartition_co2, p_repartition_ch4,
+                  p_duration_co2, p_duration_ch4,
+                  labels = c("c", "d","e","f"), align = "hv", common.legend = F), nrow = 1, widths = c(0.2,0.2,0.6),
+                  labels = c("a", "b"), align = "hv", common.legend = T, legend = "bottom")
+
+
+
+p_mat_exprts_selections <- ggpubr::ggarrange(p_mat_co2, p_mat_ch4, p_repartition_co2, p_repartition_ch4, nrow = 1, widths = c(0.3,0.3,0.2,0.2),
+                                             labels = c("a", "b","c","d"), align = "hv", common.legend = T, legend = "bottom")
+
+
+p_mat_exprts_selections
+
+
+ggsave(plot = p_mat_exprts_selections, filename = "Fig2_overview_time_series_selection_experts.jpeg", path = plots_path, 
+       width = 10, height = 4., dpi = 300, units = 'in', scale = 1.3)
+
+
+
+# p_co2_ch4_fluxes <- ggplot(stats_all, aes(flux_co2, flux_ch4))+geom_point(alpha=0.5)+
+#   # xlab("Average CO2 [ppm]")+
+#   # ylab("Standard deviation CO2 [ppm]")+
+#   scale_x_log10()+
+#   scale_y_log10()+
+#   theme_article()
+# ggMarginal(p_co2_ch4_fluxes, type="density")
+# 
+# 
+# ggplot(stats_all, aes(as.factor(n_bubbles), ebull_ch4))+geom_boxplot(alpha=0.5)+
+#   # xlab("Average CO2 [ppm]")+
+#   # ylab("Standard deviation CO2 [ppm]")+
+#   # scale_x_log10()+
+#   scale_y_log10()+
+#   theme_article()
 
 
 
@@ -444,9 +957,6 @@ ggsave(plot = p_flagged, filename = "flagged.jpeg", path = plots_path,
 
 # ---- Differences between experts CO2 ----
 
-# first we remove from the tables the incubations flagged as anomalous
-# table_draws <- table_draws[ ! table_draws$uniqAssessID %in% tmpstmp_flag_co2, ]
-# table_all_clean <- table_all[ ! table_all$uniqAssessID %in% tmpstmp_flag_co2, ]
 
 ind_multiple_assess <- which(duplicated(table_draws$UniqueID))
 list_multiple_experts <- unique(table_draws$UniqueID[ind_multiple_assess])
@@ -484,62 +994,157 @@ df_multiple_users_co2$abs_diff <- abs(df_multiple_users_co2$flux_blind-df_multip
 df_multiple_users_co2$rel_diff <- (df_multiple_users_co2$flux_blind-df_multiple_users_co2$flux_users_mean)/df_multiple_users_co2$flux_users_mean*100
 
 
-flux_ref = CO2_flux.man$best.flux
-flux_model = CO2_flux.auto$best.flux[match(CO2_flux.man$UniqueID, CO2_flux.auto$UniqueID)]
-df_exceedance_CO2 <- get_df_exceedance(abs(flux_model - flux_ref)/flux_model*100)
-ind_closest_10 <- which.min(abs(df_exceedance_CO2$t-10))
+# ggplot(df_multiple_users_co2, aes(abs(flux_users_CV)))+geom_density()+scale_x_log10()
 
-p_exceed <- ggplot(df_exceedance_CO2, aes(t, p))+geom_path()+geom_point()+
-  geom_hline(yintercept = 0)+
-  theme_bw()+
-  geom_segment(aes(x=-0,xend=10,
-                   y=df_exceedance_CO2$p[ind_closest_10], yend=df_exceedance_CO2$p[ind_closest_10]), color ="red")+
-  geom_segment(aes(x=10,xend=10,
-                   y=-Inf, yend=df_exceedance_CO2$p[ind_closest_10]), color ="red")+
-  # scale_x_log10()+
-  scale_x_continuous(transform = "log10", breaks = c(1,10,100,1000))+
-  ylab("Proportion of timeseries [%]")+
-  xlab("Relative difference [% of Expert flux]")+
-  ggtitle(paste0(round(df_exceedance_CO2$p[ind_closest_10]*10)/10,"% timeseries with < 10% difference"))
+df_multiple_users_co2$is_gfact_over_2 <- "linear"
+df_multiple_users_co2$is_gfact_over_2[df_multiple_users_co2$g.fact>=2] <- "non-linear"
 
-p_exceed
-ggsave(plot = p_exceed, filename = "overview_expert_vs_blind_co2.jpg", path = plots_path, 
-       width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+df_multiple_users_co2$r2_over_0.9 <- "LM.r2 < 0.9"
+df_multiple_users_co2$r2_over_0.9[df_multiple_users_co2$LM.r2>=.9] <- "LM.r2 >= 0.9"
 
 
+length(which(df_multiple_users_co2$flux_users_CV<0.1))/dim(df_multiple_users_co2)[1]*100
+length(which(df_multiple_users_co2$flux_users_CV>0.5))/dim(df_multiple_users_co2)[1]*100
 
 
+# plot(log10(df_multiple_users_co2$LM.RMSE), log10(df_multiple_users_co2$LM.MAE))
 
-names(df_multiple_users_co2)
+
+plt_MAE_sd_co2 <- ggplot(df_multiple_users_co2, aes(LM.MAE, abs(flux_users_sd), colour = log10(LM.MAE)))+
+  geom_point()+
+  xlab(expression("LM MAE FCO2 [\u00b5mol " * m^-2 ~ s^-1* "]"))+
+  ylab("SD of experts' FCO2 [\u00b5mol " * m^-2 ~ s^-1* "]")+
+  scale_x_log10()+
+  scale_y_log10()+
+  theme_article()+
+  # scale_colour_manual(values = c("#1b9e77","#fc8d62"))+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+plt_MAE_sd_co2
 
 
-p1 <- ggplot(df_multiple_users_co2, aes(flux_blind, flux_users_mean, colour = n))+
+plt_MAE_CV_co2 <- ggplot(df_multiple_users_co2, aes(LM.MAE, abs(flux_users_CV), colour = log10(LM.MAE)))+
+  geom_point()+
+  xlab(expression("LM MAE FCO2 [\u00b5mol " * m^-2 ~ s^-1* "]"))+
+  ylab("CV of experts' FCO2 [-]")+
+  scale_x_log10()+
+  scale_y_log10()+
+  theme_article()+
+  # scale_colour_manual(values = c("#1b9e77","#fc8d62"))+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+plt_MAE_CV_co2
+
+plt_mean_CV_co2 <- ggplot(df_multiple_users_co2, aes(abs(flux_users_mean), abs(flux_users_CV), colour = log10(LM.MAE)))+
+  geom_point()+
+  
+  xlab(expression(group("|", bar(F[CO2]^expert), "|")~~"[\u00b5mol " * m^-2 ~ s^-1* "]"))+
+  
+  # xlab(expression(tilde(*F[CO2]^expert)~~"[\u00b5mol " * m^-2 ~ s^-1* "]"))+
+  ylab("CV of estimated FCO2 [dimensionless]")+
+  scale_x_log10()+scale_y_log10()+theme_article()+
+  # scale_colour_manual(values = c("#1b9e77","#fc8d62"))+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+# plt_mean_CV_co2 <- ggMarginal(plt_mean_CV_co2, type="density", groupColour = T)
+plt_mean_CV_co2
+
+
+p_expert_vs_blind_CO2 <- ggplot(df_multiple_users_co2, aes(flux_blind, flux_users_mean, colour = log10(LM.MAE)))+
   scale_x_log10()+
   scale_y_log10()+
   geom_abline(slope = 1, intercept = 0)+
-  geom_point(aes(size=g.fact))+
   geom_errorbar(aes(ymin=flux_users_mean-flux_users_sd, 
-                    ymax=flux_users_mean+flux_users_sd))+
-  xlab("Blind LM (CO2)")+
-  ylab("Expert LM (CO2)")+
-  scale_size(range = c(1,5))+
-  scale_colour_viridis_c(direction = -1, option = "A", begin = 0.1, end = 0.9)+
-  theme_article()
+                    ymax=flux_users_mean+flux_users_sd), linewidth = 1.2, alpha = 0.5)+
+  geom_point()+
+  xlab(expression(F[CO2]^auto~~"[\u00b5mol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression(F[CO2]^expert~~"[\u00b5mol " * m^-2 ~ s^-1* "]"))+
+  scale_size(range = c(0.1,5))+
+  theme_article()+
+  # scale_colour_manual(values = c("#1b9e77","#fc8d62"))+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
 
 
-p2 <- ggplot(df_multiple_users_co2, aes(abs_diff, abs(flux_users_CV), colour = n, size=g.fact))+geom_point()+
+
+
+p_out_CO2 <- ggpubr::ggarrange(p_expert_vs_blind_CO2, plt_MAE_sd_co2, nrow = 1, 
+                                           common.legend = T, legend = "bottom", labels = c("a)","b)"))
+p_out_CO2
+
+
+ggsave(plot = p_out_CO2, filename = "Fig4_expert_vs_blind_CO2.jpeg", path = plots_path, 
+       width = 6, height = 3.5, dpi = 300, units = 'in', scale = 1.2)
+
+
+
+
+p_mean_SD_co2 <- ggplot(df_multiple_users_co2, aes(abs(flux_users_mean), abs(flux_users_sd), colour = log10(LM.MAE)))+geom_point()+
   scale_x_log10()+
   scale_y_log10()+
-  xlab("abs((Blind - mean(Expert)) [CO2 flux]")+
-  ylab("abs(CV(Expert)) [d.l.]")+
-  scale_size(range = c(1,5))+
-  scale_colour_viridis_c(direction = -1, option = "A", begin = 0.1, end = 0.9)+
-  theme_article()
+  xlab(expression(bar(F[CO2]^expert)~~"[\u00b5mol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression("SD of "*F[CO2]^expert~~"[\u00b5mol " * m^-2 ~ s^-1* "]"))+
+  theme_article()+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
 
-p_expert_vs_blind_CO2 <- ggpubr::ggarrange(p1, p2, nrow = 1, common.legend = T, legend = "right")
-p_expert_vs_blind_CO2
-ggsave(plot = p_expert_vs_blind_CO2, filename = "expert_vs_blind_CO2.jpeg", path = plots_path, 
-       width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+# p_mean_SD_co2_dens <- ggMarginal(p_mean_SD_co2, type="density", groupColour = T)
+
+
+p_mean_CV_co2 <- ggplot(df_multiple_users_co2, aes(abs(flux_users_mean), abs(flux_users_CV), colour = log10(LM.MAE)))+geom_point()+
+  scale_x_log10()+
+  scale_y_log10()+
+  xlab(expression(bar(F[CO2]^expert)~~"[\u00b5mol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression("CV of "*F[CO2]^expert))+
+  theme_article()+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+# p_mean_CV_co2_dens <- ggMarginal(p_mean_CV_co2, type="density", groupColour = T)
+
+p_mean_SD_CV_co2 <- ggarrange(p_mean_SD_co2, p_mean_CV_co2, ncol = 2, common.legend = T)
+
+# flux_ref = CO2_flux.man$best.flux
+# flux_model = CO2_flux.auto$best.flux[match(CO2_flux.man$UniqueID, CO2_flux.auto$UniqueID)]
+# df_exceedance_CO2 <- get_df_exceedance(abs(flux_model - flux_ref)/flux_model*100)
+# ind_closest_10 <- which.min(abs(df_exceedance_CO2$t-10))
+# 
+# p_exceed <- ggplot(df_exceedance_CO2, aes(t, p))+geom_path()+geom_point()+
+#   geom_hline(yintercept = 0)+
+#   theme_bw()+
+#   geom_segment(aes(x=-0,xend=10,
+#                    y=df_exceedance_CO2$p[ind_closest_10], yend=df_exceedance_CO2$p[ind_closest_10]), color ="red")+
+#   geom_segment(aes(x=10,xend=10,
+#                    y=-Inf, yend=df_exceedance_CO2$p[ind_closest_10]), color ="red")+
+#   # scale_x_log10()+
+#   scale_x_continuous(transform = "log10", breaks = c(1,10,100,1000))+
+#   ylab("Proportion of timeseries [%]")+
+#   xlab("Relative difference [% of Expert flux]")+
+#   ggtitle(paste0(round(df_exceedance_CO2$p[ind_closest_10]*10)/10,"% timeseries with < 10% difference"))
+# 
+# p_exceed
+# ggsave(plot = p_exceed, filename = "overview_expert_vs_blind_co2.jpg", path = plots_path, 
+#        width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+
+
+
+# p2 <- ggplot(df_multiple_users_co2, aes(abs_diff, abs(flux_users_CV)))+geom_point()+
+#   scale_x_log10()+
+#   scale_y_log10()+
+#   xlab("abs((Automated - mean(Expert))  [\u00b5mol m-2 s-1]")+
+#   ylab("abs(CV(Expert)) [d.l.]")+
+#   scale_size(range = c(0.1,5))+
+#   scale_colour_viridis_c(direction = 1, option = "A", begin = 0.1, end = 0.9)+
+#   theme_article()
+
+
+
+
+# p1 <- p1 + geom_point(aes(size=g.fact, colour = g.fact))
+# p2 <- p2 + geom_point(aes(size=g.fact, colour = g.fact))
+# 
+# p_expert_vs_blind_CO2 <- ggpubr::ggarrange(p1, p2, nrow = 1, common.legend = T, legend = "right")
+# p_expert_vs_blind_CO2
+# ggsave(plot = p_expert_vs_blind_CO2, filename = "expert_vs_blind_CO2_curvature.jpeg", path = plots_path, 
+#        width = 8, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+
 
 
 
@@ -554,7 +1159,7 @@ table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_co2-(table_draws_s
 
 p_disagree_CO2 <- ggplot()+
   geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
-                                              ymin = -Inf, ymax = Inf, fill=userID), alpha=0.2)+
+                                        ymin = -Inf, ymax = Inf, fill=userID), alpha=0.2)+
   geom_path(data = mydata_sel, aes(as.numeric(Etime), CO2dry_ppm, group = UniqueID))+
   theme_article()+
   xlab("Elapsed time [secs]")+
@@ -576,7 +1181,7 @@ table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_co2-(table_draws_s
 
 ggplot()+
   geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
-                                              ymin = -Inf, ymax = Inf), fill="grey50", alpha=0.2)+
+                                        ymin = -Inf, ymax = Inf), fill="grey50", alpha=0.2)+
   geom_path(data = mydata_sel, aes(as.numeric(Etime), CO2dry_ppm, group = UniqueID))+
   theme_article()+
   facet_wrap(UniqueID~., scales = "free")
@@ -584,7 +1189,7 @@ ggplot()+
 
 
 
-# ---- Differences between experts CH4 - COMPUTING ----
+# ---- Differences between experts CH4 --> COMPUTING ----
 
 isF <- T
 runID <- 0
@@ -605,6 +1210,8 @@ for(i in list_multiple_experts){
                                               var = "CH4",
                                               n = n,
                                               g.fact = CH4_flux.auto$g.fact[i_flux_blind],
+                                              LM.r2 = CH4_flux.auto$LM.r2[which(CH4_flux.auto$UniqueID==i)],
+                                              LM.MAE = CH4_flux.auto$LM.MAE[which(CH4_flux.auto$UniqueID==i)],
                                               
                                               total_blind = CH4_flux.auto$total.flux[i_flux_blind],
                                               total_users_mean = mean(tab_users$total.flux),
@@ -633,11 +1240,715 @@ df_multiple_users_CH4$diffusion_rel_diff <- (df_multiple_users_CH4$diffusion_bli
 df_multiple_users_CH4$ebull_abs_diff <- abs(df_multiple_users_CH4$ebull_blind-df_multiple_users_CH4$ebull_users_mean)
 df_multiple_users_CH4$ebull_rel_diff <- (df_multiple_users_CH4$ebull_blind-df_multiple_users_CH4$ebull_users_mean)/df_multiple_users_CH4$ebull_users_mean*100
 
+
+df_multiple_users_CH4$ebull_contrib <- df_multiple_users_CH4$ebull_blind/df_multiple_users_CH4$total_blind
+df_multiple_users_CH4$ebull_contrib [which(df_multiple_users_CH4$ebull_contrib >1)] <- NA
+df_multiple_users_CH4$Bubbling <- "< 10%"
+df_multiple_users_CH4$Bubbling[which(df_multiple_users_CH4$ebull_contrib>0.1)] <- "> 10%"
+
+
+
 names(df_multiple_users_CH4)
 
 
+# ---- Differences between experts total CH4 ----
 
-# ---- Differences between experts TOTAL CH4 ----
+df_multiple_users_CH4$is_gfact_over_2 <- "linear"
+df_multiple_users_CH4$is_gfact_over_2[df_multiple_users_CH4$g.fact>=2] <- "non-linear"
+
+df_multiple_users_CH4$r2_over_0.9 <- "LM.r2 < 0.9"
+df_multiple_users_CH4$r2_over_0.9[df_multiple_users_CH4$LM.r2>=.9] <- "LM.r2 >= 0.9"
+
+
+
+length(which(df_multiple_users_CH4$total_users_CV<0.1))/dim(df_multiple_users_CH4)[1]*100
+length(which(df_multiple_users_CH4$total_users_CV>0.5))/dim(df_multiple_users_CH4)[1]*100
+length(which(df_multiple_users_CH4$total_users_CV>1))/dim(df_multiple_users_CH4)[1]*100
+
+
+
+p_mean_SD_ch4tot <- ggplot(df_multiple_users_CH4, aes(abs(total_users_mean), abs(total_users_sd), colour = log10(LM.MAE)))+geom_point()+
+  scale_x_log10()+
+  scale_y_log10()+
+  xlab(expression(bar(F[CH4~tot]^expert)~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression("SD of "*F[CH4~tot]^expert~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  theme_article()+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+# p_mean_SD_co2_dens <- ggMarginal(p_mean_SD_co2, type="density", groupColour = T)
+
+
+p_mean_CV_ch4tot <- ggplot(df_multiple_users_CH4, aes(abs(total_users_mean), abs(total_users_CV), colour = log10(LM.MAE)))+geom_point()+
+  scale_x_log10()+
+  scale_y_log10()+
+  xlab(expression(bar(F[CH4~tot]^expert)~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression("CV of "*F[CH4~tot]^expert))+
+  theme_article()+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+
+p_mean_SD_CV_co2_ch4tot <- ggarrange(p_mean_SD_co2, p_mean_CV_co2,
+                                     p_mean_SD_ch4tot, p_mean_CV_ch4tot, nrow = 2, ncol = 2, 
+                                     labels = c("a)","b)",
+                                                "c)","d)"),
+                                     common.legend = T, legend = "bottom")
+
+p_mean_SD_CV_co2_ch4tot
+
+ggsave(plot = p_mean_SD_CV_co2_ch4tot, filename = "FigX_mean_SD_CV_Fco2_Fch4tot.jpeg", path = plots_path, 
+       width = 8, height = 5.5, dpi = 300, units = 'in', scale = 1.2)
+
+
+
+
+
+
+plt_MAE_sd_CH4tot <- ggplot(df_multiple_users_CH4, aes(LM.MAE, abs(total_users_sd), 
+                                                       colour = log10(LM.MAE)))+
+  geom_point()+
+  xlab(expression("LM.MAE of "*F[CH4~tot]^auto~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression("SD of "*F[CH4~tot]^expert~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  scale_x_log10()+scale_y_log10()+theme_article()+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+plt_MAE_sd_CH4tot
+
+
+plt_MAE_sd_CH4ebull <- ggplot(df_multiple_users_CH4, aes(LM.MAE, abs(ebull_users_sd), 
+                                                       colour = log10(LM.MAE)))+
+  geom_point()+
+  xlab(expression("LM.MAE of "*F[CH4~tot]^auto~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression("SD of "*F[CH4~ebull]^expert~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  scale_x_log10()+scale_y_log10()+theme_article()+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+plt_MAE_sd_CH4ebull
+
+
+
+plt_MAE_sd_CH4diffusion <- ggplot(df_multiple_users_CH4, aes(LM.MAE, abs(diffusion_users_sd), 
+                                                             colour = log10(LM.MAE)))+
+  geom_point()+
+  xlab(expression("LM.MAE of "*F[CH4~tot]^auto~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression("SD of "*F[CH4~diff]^expert~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  scale_x_log10()+scale_y_log10()+theme_article()+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+plt_MAE_sd_CH4diffusion
+
+
+
+
+plt_MAE_CV_CH4tot <- ggplot(df_multiple_users_CH4, aes(LM.MAE, abs(total_users_CV), 
+                                                       colour = log10(LM.MAE)))+
+  geom_point()+
+  xlab(expression("LM.MAE of "*F[CH4~tot]^auto~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression("CV of "*F[CH4~tot]^expert))+
+  scale_x_log10()+scale_y_log10()+theme_article()+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+plt_MAE_CV_CH4tot
+
+
+
+plt_MAE_CV_CH4ebull <- ggplot(df_multiple_users_CH4, aes(LM.MAE, abs(ebull_users_CV), 
+                                                         colour = log10(LM.MAE)))+
+  geom_point()+
+  xlab(expression("LM.MAE of "*F[CH4~tot]^auto~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression("CV of "*F[CH4~ebull]^expert))+
+  scale_x_log10()+scale_y_log10()+theme_article()+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+plt_MAE_CV_CH4ebull
+
+
+
+plt_MAE_CV_CH4diffusion <- ggplot(df_multiple_users_CH4, aes(LM.MAE, abs(diffusion_users_CV), 
+                                                             colour = log10(LM.MAE)))+
+  geom_point()+
+  xlab(expression("LM.MAE of "*F[CH4~tot]^auto~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression("CV of "*F[CH4~diff]^expert))+
+  scale_x_log10()+scale_y_log10()+theme_article()+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+plt_MAE_CV_CH4diffusion
+
+
+
+plt_mean_CV_CH4tot <- ggplot(df_multiple_users_CH4, aes(abs(total_users_mean), abs(total_users_CV), colour = log10(LM.MAE)))+
+  geom_point()+
+  xlab(expression(bar(F[CH4~tot]^expert)~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression("CV of "*F[CH4~tot]^expert))+
+  scale_x_log10()+scale_y_log10()+theme_article()+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+# plt_mean_CV_CH4 <- ggMarginal(plt_mean_CV_CH4, type="density", groupColour = T)
+plt_mean_CV_CH4tot
+
+
+p_expert_vs_blind_CH4tot <- ggplot(df_multiple_users_CH4[which(df_multiple_users_CH4$total_users_mean > 0),],
+                                   aes(total_blind, total_users_mean, colour = log10(LM.MAE)))+
+  scale_x_log10()+
+  scale_y_log10()+
+  geom_abline(slope = 1, intercept = 0)+
+  geom_point()+
+  # geom_point(aes(size = ebull_contrib))+
+  geom_errorbar(aes(ymin=total_users_mean-total_users_sd, 
+                    ymax=total_users_mean+total_users_sd), linewidth = 1.2, alpha = 0.5)+
+  xlab(expression(F[CH4~tot]^auto~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression(F[CH4~tot]^expert~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  theme_article()+
+  scale_colour_viridis_c(direction = -1, option = "B", end = 0.9)
+
+
+ggplot(df_multiple_users_CH4[which(df_multiple_users_CH4$total_users_mean > 0),],
+       aes(total_blind, total_users_mean, colour = ebull_contrib))+
+  scale_x_log10()+
+  scale_y_log10()+
+  geom_abline(slope = 1, intercept = 0)+
+  geom_point()+
+  # geom_point(aes(size = ebull_contrib))+
+  geom_errorbar(aes(ymin=total_users_mean-total_users_sd, 
+                    ymax=total_users_mean+total_users_sd), linewidth = 1.2, alpha = 0.5)+
+  xlab(expression(F[CH4~tot]^auto~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression(F[CH4~tot]^expert~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  theme_article()+
+  scale_colour_viridis_c(direction = -1, option = "A", end = 0.8)
+
+
+
+
+
+
+ggplot(df_multiple_users_CH4, aes(abs(ebull_contrib), abs(diffusion_users_CV), 
+                                  colour = Bubbling))+
+  geom_point()+
+  # scale_x_log10()+scale_y_log10()+
+  theme_article()+
+  scale_colour_viridis_d(direction = -1, option = "A", end = 0.8)
+
+
+
+
+
+
+df_contrib <- df_multiple_users_CH4[,c("runID","total_users_CV","diffusion_users_CV","ebull_users_CV","ebull_contrib")]
+names(df_contrib) <- c("runID","Total flux","Diffusion","Ebullition","ebull_contrib")
+df_contrib_gath <- gather(df_contrib[!is.na(df_contrib$ebull_contrib),], var, CV, -runID, -ebull_contrib)
+
+length(which(df_contrib$ebull_contrib>0.5))
+length(which(df_contrib$diffusion>1 & df_contrib$ebull_contrib>0.5))
+
+length(which(df_contrib$total>1 & df_contrib$ebull_contrib<0.5))
+mean(df_contrib$diffusion[which(df_contrib$ebull_contrib>0.1 & df_contrib$ebull_contrib<0.5)])
+sd(df_contrib$diffusion[which(df_contrib$ebull_contrib>0.1 & df_contrib$ebull_contrib<0.5)])
+
+mean(df_contrib$total[which(df_contrib$ebull_contrib>0.1 & df_contrib$ebull_contrib<0.5)])
+sd(df_contrib$total[which(df_contrib$ebull_contrib>0.1 & df_contrib$ebull_contrib<0.5)])
+
+mean(df_contrib$diffusion[which(df_contrib$ebull_contrib>0.5)])
+sd(df_contrib$diffusion[which(df_contrib$ebull_contrib>0.5)])
+mean(df_contrib$total[which(df_contrib$ebull_contrib>0.5)])
+sd(df_contrib$total[which(df_contrib$ebull_contrib>0.5)])
+
+mean(df_contrib$ebullition[which(df_contrib$ebull_contrib>0.1)], na.rm = T)
+sd(df_contrib$ebullition[which(df_contrib$ebull_contrib>0.1)], na.rm = T)
+
+
+
+
+df_contrib_gath$ebull_ratio_range <- "0"
+
+df_contrib_gath$ebull_ratio_range[which(abs(df_contrib_gath$ebull_contrib)>0 & 
+                                           abs(df_contrib_gath$ebull_contrib)<=0.2)] <- "0 - 0.2"
+
+df_contrib_gath$ebull_ratio_range[which(abs(df_contrib_gath$ebull_contrib )>0.2 & 
+                                           abs(df_contrib_gath$ebull_contrib)<=0.4)] <- "0.2 - 0.4"
+
+df_contrib_gath$ebull_ratio_range[which(abs(df_contrib_gath$ebull_contrib)>0.4 & 
+                                           abs(df_contrib_gath$ebull_contrib)<=0.6)] <- "0.4 - 0.6"
+
+df_contrib_gath$ebull_ratio_range[which(abs(df_contrib_gath$ebull_contrib )>0.6 & 
+                                           abs(df_contrib_gath$ebull_contrib)<=0.8)] <- "0.6 - 0.8"
+
+df_contrib_gath$ebull_ratio_range[which(abs(df_contrib_gath$ebull_contrib)>0.8)] <- "0.8 - 1"
+
+
+df_contrib_gath$ebull_ratio_range <- factor(df_contrib_gath$ebull_ratio_range, levels = c("0","0 - 0.2", "0.2 - 0.4", "0.4 - 0.6",  "0.6 - 0.8",  "0.8 - 1"))
+
+
+df_bubb_plt <- df_contrib_gath[which(!is.na(df_contrib_gath$ebull_contrib) & !is.na(df_contrib_gath$CV)),]
+
+p_CVs_ch4_bubbling_a <- ggplot(df_bubb_plt[df_bubb_plt$var=="Ebullition",],
+                             aes(ebull_ratio_range, abs(CV)))+
+  geom_boxplot(outliers = F, alpha=0.5)+
+  geom_jitter(width = 0.2, alpha=.2)+
+  xlab("")+
+  # xlab(expression("Ebullition ratio "*F[CH4~ebull]^auto~~"/"*~~F[CH4~tot]^auto))+
+  ylab(expression("CV of "*F[CH4~ebull]^expert))+
+  theme_article()+facet_wrap(var~.)+
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))
+
+
+p_CVs_ch4_bubbling_b <- ggplot(df_bubb_plt[df_bubb_plt$var=="Diffusion",],
+                               aes(ebull_ratio_range, abs(CV)))+
+  geom_boxplot(outliers = F, alpha=0.5)+
+  geom_jitter(width = 0.2, alpha=.2)+
+  # xlab("")+
+  xlab(expression("Ebullition ratio "*F[CH4~ebull]^auto~~"/"*~~F[CH4~tot]^auto))+
+  ylab(expression("CV of "*F[CH4~diff]^expert))+
+  theme_article()+facet_wrap(var~.)+
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))
+
+
+
+p_CVs_ch4_bubbling_c <- ggplot(df_bubb_plt[df_bubb_plt$var=="Total flux",],
+                               aes(ebull_ratio_range, abs(CV)))+
+  geom_boxplot(outliers = F, alpha=0.5)+
+  geom_jitter(width = 0.2, alpha=.2)+
+  xlab("")+
+  # xlab(expression("Ebullition ratio "*F[CH4~ebull]^auto~~"/"*~~F[CH4~tot]^auto))+
+  ylab(expression("CV of "*F[CH4~tot]^expert))+
+  theme_article()+facet_wrap(var~.)+
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))
+
+
+p_CVs_ch4_bubbling <- ggpubr::ggarrange(p_CVs_ch4_bubbling_a, p_CVs_ch4_bubbling_b, p_CVs_ch4_bubbling_c,
+                                        nrow = 1, labels = c("a","b","c"), align = "h")
+
+p_CVs_ch4_bubbling
+
+ggsave(plot = p_CVs_ch4_bubbling, filename = "Fig4_CVs_ch4_bubbling.jpeg", path = plots_path, 
+       width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.2)
+
+
+
+ggplot(df_multiple_users_CH4[!is.na(df_multiple_users_CH4$ebull_contrib),],
+       aes(factor(ceiling(ebull_contrib*10/2)*2/10), abs(total_users_CV)))+
+  # scale_x_log10()+
+  scale_y_log10()+
+  geom_jitter(width = 0.2, alpha=.2)+
+  geom_boxplot(outliers = F, alpha=0.2)+
+  xlab(expression(F[CH4~ebull]^auto~~"/"*~~F[CH4~tot]^auto))+
+  ylab(expression("CV of "*F[CH4~tot]^expert))+
+  scale_colour_viridis_c(direction = -1, option = "A", begin = 0.1, end = 0.9)+
+  theme_article()
+
+
+head(df_multiple_users_CH4)
+
+# ggplot(df_multiple_users_CH4, aes(total_blind))+geom_density()+theme_article()
+# ggplot(df_multiple_users_CH4, aes(total_blind))+geom_histogram()+theme_article()
+
+
+
+plt_mean_CV_CH4ebull <- ggplot(df_multiple_users_CH4, aes(abs(ebull_users_mean), abs(ebull_users_CV), colour = Bubbling))+
+  geom_point()+
+  xlab(expression(bar(F[CH4~ebull]^expert)~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression("CV of "*F[CH4~ebull]^expert))+
+  scale_x_log10()+scale_y_log10()+theme_article()+
+  scale_colour_viridis_d(direction = -1, option = "A", end = 0.8)
+
+# plt_mean_CV_CH4ebull <- ggMarginal(plt_mean_CV_CH4ebull, type="density", groupColour = T)
+plt_mean_CV_CH4ebull
+
+
+plt_mean_CV_CH4diffusion <- ggplot(df_multiple_users_CH4, aes(abs(diffusion_users_mean), abs(diffusion_users_CV), colour = Bubbling))+
+  geom_point()+
+  xlab(expression(bar(F[CH4~diff]^expert)~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression("CV of "*F[CH4~diff]^expert))+
+  scale_x_log10()+scale_y_log10()+theme_article()+
+  scale_colour_viridis_d(direction = -1, option = "A", end = 0.8)
+
+# plt_mean_CV_CH4diffusion <- ggMarginal(plt_mean_CV_CH4diffusion, type="density", groupColour = T)
+plt_mean_CV_CH4diffusion
+
+
+p_expert_vs_blind_CH4diffusion <- ggplot(df_multiple_users_CH4, 
+                                         aes(diffusion_blind, diffusion_users_mean, colour = Bubbling))+
+  scale_x_log10()+
+  scale_y_log10()+
+  geom_abline(slope = 1, intercept = 0)+
+  geom_point()+
+  geom_errorbar(aes(ymin=diffusion_users_mean-diffusion_users_sd, 
+                    ymax=diffusion_users_mean+diffusion_users_sd), linewidth = 1.2, alpha = .5)+
+  xlab(expression(F[CH4~diff]^auto~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression(F[CH4~diff]^expert~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  theme_article()+
+  scale_colour_viridis_d(direction = -1, option = "A", end = 0.8)
+
+
+
+
+# df_ebull <- df_multiple_users_CH4[df_multiple_users_CH4$ebull_blind>0 & df_multiple_users_CH4$ebull_users_mean>0,]
+p_expert_vs_blind_CH4ebullition <- ggplot(df_multiple_users_CH4, aes(ebull_blind, ebull_users_mean, colour = Bubbling))+
+  scale_x_log10()+
+  scale_y_log10()+
+  geom_abline(slope = 1, intercept = 0)+
+  geom_point()+
+  geom_errorbar(aes(ymin=ebull_users_mean-ebull_users_sd, 
+                    ymax=ebull_users_mean+ebull_users_sd), linewidth = 1.2, alpha = .5)+
+  xlab(expression(F[CH4~ebull]^auto~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression(F[CH4~ebull]^expert~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  theme_article()+
+  scale_colour_viridis_d(direction = -1, option = "A", end = 0.8)
+
+
+
+p_expert_vs_blind_CH4 <- ggpubr::ggarrange(plt_mean_CV_CH4tot, p_expert_vs_blind_CH4tot, 
+                                           plt_mean_CV_CH4diffusion, p_expert_vs_blind_CH4diffusion,
+                                           plt_mean_CV_CH4ebull, p_expert_vs_blind_CH4ebullition,
+                                           nrow = 3, ncol = 2, labels = c("a)","b)",
+                                                                          "c)","d)",
+                                                                          "e)","f)"),
+                                           common.legend = T, legend = "bottom")
+p_expert_vs_blind_CH4
+ggsave(plot = p_expert_vs_blind_CH4, filename = "Fig5_expert_vs_blind_CH4.jpeg", path = plots_path, 
+       width = 8, height = 7.5, dpi = 300, units = 'in', scale = 1.2)
+
+
+
+
+p_expert_vs_blind_CO2_CH4 <- ggpubr::ggarrange(p_expert_vs_blind_CO2, p_expert_vs_blind_CH4tot, 
+                                               p_expert_vs_blind_CH4diffusion, p_expert_vs_blind_CH4ebullition,
+                                                 nrow = 2, ncol = 2, labels = c("a)","b)",
+                                                                                "c)","d)"),
+                                                 common.legend = T, legend = "bottom")
+p_expert_vs_blind_CO2_CH4
+ggsave(plot = p_expert_vs_blind_CO2_CH4, filename = "Fig_experts_vs_blind.jpeg", path = plots_path, 
+       width = 8, height = 6, dpi = 300, units = 'in', scale = 1.2)
+
+
+
+
+
+
+p_expert_vs_blind_CO2_CH4 <- ggpubr::ggarrange(p_expert_vs_blind_CO2, p_expert_vs_blind_CH4tot, 
+                                               plt_MAE_sd_co2, plt_MAE_sd_CH4tot,
+                                               nrow = 2, ncol = 2, labels = c("a)","b)",
+                                                                              "c)","d)"),
+                                               common.legend = T, legend = "bottom")
+p_expert_vs_blind_CO2_CH4
+ggsave(plot = p_expert_vs_blind_CO2_CH4, filename = "FigX_experts_vs_blind_CO2_CH4tot.jpeg", path = plots_path, 
+       width = 8, height = 6, dpi = 300, units = 'in', scale = 1.2)
+
+
+
+
+
+
+
+p_LM_MAE_SD_experts_CO2_CH4 <- ggpubr::ggarrange(plt_MAE_sd_co2, plt_MAE_sd_CH4tot, 
+                                           plt_MAE_sd_CH4diffusion, plt_MAE_sd_CH4ebull,
+                                           nrow = 2, ncol = 2, labels = c("a)","b)",
+                                                                          "c)","d)"),
+                                           common.legend = T, legend = "bottom")
+p_LM_MAE_SD_experts_CO2_CH4
+ggsave(plot = p_LM_MAE_SD_experts_CO2_CH4, filename = "Fig_LM_MAE_SD_experts.jpeg", path = plots_path, 
+       width = 8, height = 6, dpi = 300, units = 'in', scale = 1.2)
+
+
+
+
+p_LM_MAE_CV_experts_CO2_CH4 <- ggpubr::ggarrange(plt_MAE_CV_co2, plt_MAE_CV_CH4tot, 
+                                                 plt_MAE_CV_CH4diffusion, plt_MAE_CV_CH4ebull,
+                                                 nrow = 2, ncol = 2, labels = c("a)","b)",
+                                                                                "c)","d)"),
+                                                 common.legend = T, legend = "bottom")
+p_LM_MAE_CV_experts_CO2_CH4
+ggsave(plot = p_LM_MAE_CV_experts_CO2_CH4, filename = "Fig_LM_MAE_CV_experts.jpeg", path = plots_path, 
+       width = 8, height = 6, dpi = 300, units = 'in', scale = 1.2)
+
+
+
+
+
+
+p_avg_SD_CV_expert_vs_auto_CO2_CH4 <- ggpubr::ggarrange(p_mean_SD_co2, p_mean_CV_co2,p_expert_vs_blind_CO2,
+                                                        p_mean_SD_ch4tot, p_mean_CV_ch4tot,p_expert_vs_blind_CH4tot,
+                                               nrow = 2, ncol = 3, labels = c("a","b","c",
+                                                                              "d","e","f"),
+                                               common.legend = T, legend = "bottom")
+p_avg_SD_CV_expert_vs_auto_CO2_CH4
+ggsave(plot = p_avg_SD_CV_expert_vs_auto_CO2_CH4, filename = "FigX_avg_SD_CV_expert_vs_auto_CO2_CH4tot.jpeg", path = plots_path, 
+       width = 8, height = 6, dpi = 300, units = 'in', scale = 1.2)
+
+
+
+
+p_avg_SD_expert_vs_auto_CO2_CH4 <- ggpubr::ggarrange(p_mean_SD_co2,p_expert_vs_blind_CO2,
+                                                        p_mean_SD_ch4tot,p_expert_vs_blind_CH4tot,
+                                                        nrow = 2, ncol = 2, labels = c("a","b",
+                                                                                       "c","d"),
+                                                        common.legend = T, legend = "bottom")
+p_avg_SD_expert_vs_auto_CO2_CH4
+ggsave(plot = p_avg_SD_expert_vs_auto_CO2_CH4, filename = "FigX_avg_SD_expert_vs_auto_CO2_CH4tot.jpeg", path = plots_path, 
+       width = 8, height = 6, dpi = 300, units = 'in', scale = 1.2)
+
+
+
+
+
+
+
+# ---------- relationship between CV CO2 and CV Ch4 -----------------
+
+
+df_multiple_users_co2$flux_users_CV_ch4 <- df_multiple_users_CH4$total_users_CV[match(df_multiple_users_co2$id, df_multiple_users_CH4$id)]
+# df_multiple_users_co2$CV_ch4 <- stats_all$CV_ch4[match(df_multiple_users_co2$id, stats_all$UniqueID)]
+df_multiple_users_co2$FCH4ebull_blind <- df_multiple_users_CH4$ebull_blind [match(df_multiple_users_co2$id, df_multiple_users_CH4$id)]
+df_multiple_users_co2$FCH4tot_blind <- df_multiple_users_CH4$total_blind [match(df_multiple_users_co2$id, df_multiple_users_CH4$id)]
+
+df_multiple_users_co2$ebull_contrib <- df_multiple_users_co2$FCH4ebull_blind/df_multiple_users_co2$FCH4tot_blind
+
+df_multiple_users_co2$ebull_contrib[which(df_multiple_users_co2$ebull_contrib > 1)] <- NA
+
+p_CVs_co2_ch4 <- ggplot(df_multiple_users_co2, aes(abs(flux_users_CV), abs(flux_users_CV_ch4)))+
+                          geom_point(aes(size = FCH4ebull_blind))+
+  scale_x_log10()+
+  scale_y_log10()+
+  # geom_smooth(method = "lm", fill="grey", color = "grey25")+
+  xlab(expression("CV of "*F[CO2]^expert))+
+  ylab(expression("CV of "*F[CH4~tot]^expert))+
+  scale_size(range = c(0.1,3))+
+  scale_colour_viridis_c(direction = 1, option = "A", begin = 0.1, end = 0.9)+
+  theme_article()
+p_CVs_co2_ch4
+
+cor(df_multiple_users_co2$flux_users_CV, df_multiple_users_co2$flux_users_CV_ch4)
+summary(lm(formula = flux_users_CV_ch4 ~ flux_users_CV, data = df_multiple_users_co2))
+
+
+ggplot(df_multiple_users_co2,
+       aes(factor(ceiling(abs(flux_users_CV_ch4)*10/2)*2/10), abs(flux_users_CV)))+
+  # scale_x_log10()+
+  scale_y_log10()+
+  geom_jitter()+
+  geom_boxplot(outliers = F, alpha=0.2)+
+  xlab(expression("CV of "*F[CH4~tot]^expert))+
+  ylab(expression("CV of "*F[CH2]^expert))+
+  scale_colour_viridis_c(direction = -1, option = "A", begin = 0.1, end = 0.9)+
+  theme_article()
+
+
+df_multiple_users_co2$CV_ch4_range <- ""
+
+df_multiple_users_co2$CV_ch4_range[which(abs(df_multiple_users_co2$flux_users_CV_ch4)>0 & 
+                                           abs(df_multiple_users_co2$flux_users_CV_ch4)<=0.05)] <- "0.0-0.05"
+
+df_multiple_users_co2$CV_ch4_range[which(abs(df_multiple_users_co2$flux_users_CV_ch4)>0.05 & 
+                                           abs(df_multiple_users_co2$flux_users_CV_ch4)<=0.1)] <- "0.05-0.1"
+
+df_multiple_users_co2$CV_ch4_range[which(abs(df_multiple_users_co2$flux_users_CV_ch4)>0.1 & 
+                                           abs(df_multiple_users_co2$flux_users_CV_ch4)<=0.2)] <- "0.1-0.2"
+
+df_multiple_users_co2$CV_ch4_range[which(abs(df_multiple_users_co2$flux_users_CV_ch4)>0.2 & 
+                                           abs(df_multiple_users_co2$flux_users_CV_ch4)<=0.3)] <- "0.2-0.3"
+
+df_multiple_users_co2$CV_ch4_range[which(abs(df_multiple_users_co2$flux_users_CV_ch4)>0.3 & 
+                                           abs(df_multiple_users_co2$flux_users_CV_ch4)<=0.4)] <- "0.3-0.4"
+
+df_multiple_users_co2$CV_ch4_range[which(abs(df_multiple_users_co2$flux_users_CV_ch4)>0.4)] <- ">0.4"
+
+df_multiple_users_co2$CV_ch4_range <- factor(df_multiple_users_co2$CV_ch4_range, levels = c("0.0-0.05", "0.05-0.1", "0.1-0.2",  "0.2-0.3",  "0.3-0.4",  ">0.4",""))
+
+
+df_multiple_users_co2$significantEbull <- "FCH4 diff > FCH4 ebull"
+df_multiple_users_co2$significantEbull[which(df_multiple_users_co2$ebull_contrib>.5)] <- "FCH4 diff < FCH4 ebull"
+
+p_CVs_co2_ch4_boxplot <- ggplot(df_multiple_users_co2[which(df_multiple_users_co2$CV_ch4_range != ""),],
+       aes(factor(CV_ch4_range), abs(flux_users_CV)))+
+  scale_y_log10()+
+  geom_jitter(width = 0.2, aes(colour = significantEbull), size=3, alpha=.5)+
+  geom_boxplot(outliers = F, alpha=0.6)+
+  xlab(expression("CV of "*F[CH4~tot]^expert))+
+  ylab(expression("CV of "*F[C02]^expert))+
+  scale_colour_viridis_d(direction = 1, option = "A", begin = 0.1, end = 0.75)+
+  theme_article()+theme(legend.title = element_blank(), legend.position = c(0.6,0.1))
+p_CVs_co2_ch4_boxplot
+
+
+ggsave(plot = p_CVs_co2_ch4_boxplot, filename = "Fig4_CV_ch4_vs_CV_co2_boxplot.jpeg", path = plots_path, 
+       width = 3, height = 2.5, dpi = 300, units = 'in', scale = 1.5)
+
+
+# examples of high CVs
+table(df_multiple_users_co2$significantEbull[which(df_multiple_users_co2$CV_ch4_range==">0.4")])
+mean(df_multiple_users_co2$flux_users_CV[which(df_multiple_users_co2$CV_ch4_range==">0.4")])
+
+list_highCVs <- df_multiple_users_co2[which(df_multiple_users_co2$flux_users_CV>.5 & df_multiple_users_co2$CV_ch4_range==">0.4"),]
+
+list_ids <- list_highCVs$id
+mydata_sel <- load_this(mylist = list_ids)
+# 
+# ggplot()+
+#   geom_path(data = mydata_sel, aes(as.numeric(Etime), CO2dry_ppm, group = UniqueID))+
+#   theme_article()+
+#   xlab("Elapsed time [secs]")+
+#   facet_wrap(UniqueID~., scales = "free")
+
+
+# list_ids <- c("s2-du-p2-1-o-d-09:17", "s1-cu-a2-16-o-d-11:58")
+# 
+# list_ids <- c("s2-du-p2-1-o-d-09:17", "s1-cu-a2-14-o-d-11:32")
+# 
+# list_ids <- c("s2-cu-r2-10-o-d-11:10", "s1-cu-a2-16-o-d-11:58")
+
+list_ids <- c("s1-cu-a2-16-o-d-11:58","s3-va-a1-4-o-d-10:04")
+
+
+mydata_sel <- load_this(mylist = list_ids)
+# table_draws_sel <- table_draws[which(table_draws$UniqueID%in%list_ids),]
+# table_draws_sel$Etime_start <- table_draws_sel$start.time_expert_ch4-(table_draws_sel$start.time_auto)
+# table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_ch4-(table_draws_sel$start.time_auto)
+
+
+CVs_co2 <- c(abs(round(list_highCVs$flux_users_CV[which(list_highCVs$id==list_ids[1])]*100)/100),
+             abs(round(list_highCVs$flux_users_CV[which(list_highCVs$id==list_ids[2])]*100)/100))
+mydata_sel$incubation <- ""
+mydata_sel$incubation[which(mydata_sel$UniqueID == list_ids[1])] <- "incubation A"
+mydata_sel$incubation[which(mydata_sel$UniqueID == list_ids[2])] <- "incubation B"
+
+
+CVs_ch4 <- c(abs(round(list_highCVs$flux_users_CV_ch4[which(list_highCVs$id==list_ids[1])]*100)/100),
+             abs(round(list_highCVs$flux_users_CV_ch4[which(list_highCVs$id==list_ids[2])]*100)/100))
+mydata_sel$incubation <- ""
+mydata_sel$incubation[which(mydata_sel$UniqueID == list_ids[1])] <- "incubation A"
+mydata_sel$incubation[which(mydata_sel$UniqueID == list_ids[2])] <- "incubation B"
+
+xs <- 0.7*c((max(mydata_sel$Etime[mydata_sel$incubation=="incubation A"])),
+           (max(mydata_sel$Etime[mydata_sel$incubation=="incubation B"])))
+
+y_co2 <- c(0.1*(max(mydata_sel$CO2dry_ppm[mydata_sel$incubation=="incubation A"])-min(mydata_sel$CO2dry_ppm[mydata_sel$incubation=="incubation A"]))+min(mydata_sel$CO2dry_ppm[mydata_sel$incubation=="incubation A"]),
+           0.1*(max(mydata_sel$CO2dry_ppm[mydata_sel$incubation=="incubation B"])-min(mydata_sel$CO2dry_ppm[mydata_sel$incubation=="incubation B"]))+min(mydata_sel$CO2dry_ppm[mydata_sel$incubation=="incubation B"]))
+
+           
+y_ch4 <- c(0.1*(max(mydata_sel$CH4dry_ppb[mydata_sel$incubation=="incubation A"])-min(mydata_sel$CH4dry_ppb[mydata_sel$incubation=="incubation A"]))+min(mydata_sel$CH4dry_ppb[mydata_sel$incubation=="incubation A"]),
+           0.1*(max(mydata_sel$CH4dry_ppb[mydata_sel$incubation=="incubation B"])-min(mydata_sel$CH4dry_ppb[mydata_sel$incubation=="incubation B"]))+min(mydata_sel$CH4dry_ppb[mydata_sel$incubation=="incubation B"]))
+
+
+
+data_geomtext <- data.frame(incubation = c("incubation A","incubation B"),
+                            incubation_short = c("A","B"),
+                            xs = xs,
+                            y_co2 = y_co2,
+                            y_ch4 = y_ch4,
+                            label_co2 = paste0("CV_FCO2=",CVs_co2),
+                            label_ch4 = paste0("CV_FCH4tot=",CVs_ch4),
+                            CV_ch4 = CVs_ch4,
+                            CV_co2 = CVs_co2,
+                            CV_ch4_range = as.factor(c(">0.4",">0.4")))
+
+
+
+p_ex_co2 <- ggplot()+
+  geom_path(data = mydata_sel, aes(as.numeric(Etime), CO2dry_ppm, group = incubation))+
+  theme_article()+
+  geom_text(data = data_geomtext, aes(xs, y_co2, label = label_co2), parse = F, size=3)+
+  xlab("Elapsed time [secs]")+
+  ylab(expression(""*CO[2~~dry]~"[ppm]"))+
+  facet_wrap(incubation~., scales = "free")
+
+
+p_ex_ch4 <- ggplot()+
+  geom_path(data = mydata_sel, aes(as.numeric(Etime), CH4dry_ppb, group = incubation))+
+  theme_article()+
+  geom_text(data = data_geomtext, aes(xs, y_ch4, label = label_ch4), size=3)+
+  xlab("Elapsed time [secs]")+
+  ylab(expression(""*CH[4~~dry]~"[ppb]"))+
+  facet_wrap(incubation~., scales = "free")
+
+
+
+p_CVs_co2_ch4 <- ggplot(df_multiple_users_co2,
+                        aes(abs(flux_users_CV_ch4), abs(flux_users_CV)))+
+  scale_x_log10()+
+  scale_y_log10()+
+  geom_point(aes(colour = significantEbull), size=3, alpha=.5)+
+  geom_point(data = df_multiple_users_co2[df_multiple_users_co2$id %in% list_ids,], 
+             aes(colour = significantEbull), size=5, alpha=.7)+
+  
+  geom_text(data =data_geomtext, aes(CV_ch4, CV_co2, label = incubation_short), nudge_x=0.02, nudge_y = -0.1, size=4)+
+  xlab(expression("CV of "*F[CH4~tot]^expert))+
+  ylab(expression("CV of "*F[CO2]^expert))+
+  scale_colour_viridis_d(direction = 1, option = "A", begin = 0.1, end = 0.75)+
+  theme_article()+theme(legend.title = element_blank(), legend.position = c(0.6,0.1))
+
+
+p_CVs_co2_ch4_boxplot <- ggplot(df_multiple_users_co2[which(df_multiple_users_co2$CV_ch4_range != ""),],
+                                aes(factor(CV_ch4_range), abs(flux_users_CV)))+
+  scale_y_log10()+
+  geom_jitter(width = 0.2, aes(colour = significantEbull), size=3, alpha=.5)+
+  geom_boxplot(outliers = F, alpha=0.6)+
+  geom_text(data =data_geomtext, aes(CV_ch4, CV_co2, label = incubation_short), nudge_x=0.5, size=3.5)+
+  xlab(expression("CV of "*F[CH4~tot]^expert))+
+  ylab(expression("CV of "*F[C02]^expert))+
+  scale_colour_viridis_d(direction = 1, option = "A", begin = 0.1, end = 0.75)+
+  theme_article()+theme(legend.title = element_blank(), legend.position = c(0.6,0.1))#+ theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))
+# p_CVs_co2_ch4_boxplot
+
+
+p_CVs_co2_ch4_boxplot_with_timeseries <- ggarrange(p_CVs_co2_ch4, ggarrange(p_ex_co2, p_ex_ch4, ncol = 1, align = "hv", labels=c("b","c")), ncol = 2, labels = c("a","",""))
+p_CVs_co2_ch4_boxplot_with_timeseries
+
+ggsave(plot = p_CVs_co2_ch4_boxplot_with_timeseries, filename = "Fig5_CV_ch4_vs_CV_co2_boxplot.jpeg", path = plots_path, 
+       width = 8, height = 4, dpi = 300, units = 'in', scale = 1.2)
+
+
+
+# ---------- distance to blind vs LM.MAE -----------------
+
+# ggplot(df_multiple_users_CH4, aes(abs(total_blind), abs(total_users_mean/total_blind)))+geom_point()+
+#   scale_x_log10()+
+#   scale_y_log10()+
+#   theme_article()
+# 
+# df_multiple_users_CH4[which(df_multiple_users_CH4$total_users_mean/df_multiple_users_CH4$total_blind>100),]
+# df_multiple_users_CH4[which(df_multiple_users_CH4$total_users_mean/df_multiple_users_CH4$total_blind<0.1),]
+
+
+
+p_MAE_absdiff_co2 <- ggplot(df_multiple_users_co2, aes(abs(LM.MAE), abs(abs_diff)))+
+  geom_point()+
+  xlab(expression("LM.MAE of "*F[CO2]^auto~~"[\u00b5mol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression(group("|", F[CO2]^auto~~-~~bar(F[CO2]^expert), "|")~~"[\u00b5mol " * m^-2 ~ s^-1* "]"))+
+  scale_x_log10()+
+  scale_y_log10()+
+  theme_article()
+
+p_MAE_absdiff_ch4tot <- ggplot(df_multiple_users_CH4, aes(abs(LM.MAE), abs(total_abs_diff)))+
+  geom_point()+
+  xlab(expression("LM.MAE of "*F[CH4~tot]^auto~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression(group("|", F[CH4~tot]^auto~~-~~bar(F[CH4~tot]^expert), "|")~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  scale_x_log10()+
+  scale_y_log10()+
+  theme_article()
+
+p_MAE_absdiff_co2_ch4tot <- ggarrange(p_MAE_absdiff_co2, p_MAE_absdiff_ch4tot, align = "hv", labels = c("a","b"))
+p_MAE_absdiff_co2_ch4tot
+
+ggsave(plot = p_MAE_absdiff_co2_ch4tot, filename = "Fig4_lmMAE_absdiff_co2_ch4tot.jpeg", path = plots_path, 
+       width = 8, height = 3.5, dpi = 300, units = 'in', scale = 1.2)
+
+
+
+ggplot(df_multiple_users_CH4, aes(abs(LM.MAE), abs(ebull_blind/total_blind)))+
+  geom_point()+
+  xlab(expression("LM.MAE of "*F[CH4~tot]^auto~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  ylab(expression(group("|", F[CH4~tot]^auto~~-~~bar(F[CH4~tot]^expert), "|")~~"[nmol " * m^-2 ~ s^-1* "]"))+
+  scale_x_log10()+
+  scale_y_log10()+
+  theme_article()
+
+
+
+# ---------------------------
+
+
+
 
 
 flux_ref = CH4_flux.man$total.flux
@@ -664,12 +1975,31 @@ ggsave(plot = p_exceed, filename = "overview_expert_vs_blind_ch4_total_flux.jpg"
 
 
 
-df_multiple_users_CH4$ebull_contrib <- df_multiple_users_CH4$ebull_blind/df_multiple_users_CH4$total_blind
-
 df_multiple_users_CH4 <- df_multiple_users_CH4[df_multiple_users_CH4$ebull_contrib >=0 & df_multiple_users_CH4$ebull_contrib<=1,]
 
+
+df_multiple_users_co2$ebull_contrib <- df_multiple_users_CH4$ebull_contrib[match(df_multiple_users_co2$id, df_multiple_users_CH4$id)]
+
+
+
+p_CVs_co2_ch4 <- ggplot(df_multiple_users_co2, aes(abs(flux_users_CV), abs(flux_users_CV_ch4), colour = ebull_contrib, size=ebull_contrib))+geom_point()+
+  scale_x_log10()+
+  scale_y_log10()+
+  xlab("CO2 CV(Expert) [d.l.]")+
+  ylab("CH4 CV(Expert) [d.l.]")+
+  scale_size(range = c(1,5))+
+  scale_colour_viridis_c(direction = 1, option = "A", begin = 0.1, end = 0.9)+
+  theme_article()
+
+ggsave(plot = p_CVs_co2_ch4, filename = "CV_ch4_vs_CV_co2_ebullcontrib.jpeg", path = plots_path, 
+       width = 5, height = 4, dpi = 300, units = 'in', scale = 1.0)
+
+
+
+
+
 p_tot <- ggplot(df_multiple_users_CH4[!is.na(df_multiple_users_CH4$ebull_contrib),],
-       aes(factor(ceiling(ebull_contrib*10/2)*2/10), total_abs_diff))+
+                aes(factor(ceiling(ebull_contrib*10/2)*2/10), total_abs_diff))+
   # scale_x_log10()+
   # scale_y_log10()+
   geom_jitter()+
@@ -682,7 +2012,7 @@ p_tot <- ggplot(df_multiple_users_CH4[!is.na(df_multiple_users_CH4$ebull_contrib
 
 
 p_diff <- ggplot(df_multiple_users_CH4[!is.na(df_multiple_users_CH4$ebull_contrib),],
-       aes(factor(ceiling(ebull_contrib*10/2)*2/10), diffusion_abs_diff))+
+                 aes(factor(ceiling(ebull_contrib*10/2)*2/10), diffusion_abs_diff))+
   # scale_x_log10()+
   # scale_y_log10()+
   geom_jitter()+
@@ -709,36 +2039,27 @@ p_ebull <- ggplot(df_multiple_users_CH4[!is.na(df_multiple_users_CH4$ebull_contr
 ggarrange(p_tot, p_diff, p_ebull, ncol = 3)
 
 
-
-
-p1 <- ggplot(df_multiple_users_CH4[which(df_multiple_users_CH4$total_users_mean > 0),],
-             aes(total_blind, total_users_mean, colour = n))+
-  scale_x_log10()+
-  scale_y_log10()+
-  geom_abline(slope = 1, intercept = 0)+
-  geom_point(aes(size = ebull_contrib))+
-  geom_errorbar(aes(ymin=total_users_mean-total_users_sd, 
-                    ymax=total_users_mean+total_users_sd))+
-  xlab("Blind (ch4 total)")+
-  ylab("Expert (ch4 total)")+
-  scale_size(range = c(0.1,3))+
-  scale_colour_viridis_c(direction = -1, option = "A", begin = 0.1, end = 0.9)+
-  theme_article()
-
-
 p2 <- ggplot(df_multiple_users_CH4[which(df_multiple_users_CH4$total_users_mean > 0),], 
-             aes(total_abs_diff, abs(total_users_CV), colour = n, size = ebull_contrib))+geom_point()+
+             aes(total_abs_diff, abs(total_users_CV)))+geom_point()+
   scale_x_log10()+
   scale_y_log10()+
-  xlab("abs((Blind - mean(Expert)) [ch4 flux]")+
+  xlab("abs((Automated - mean(Expert)) [nmol m-2 s-1]")+
   ylab("abs(CV(Expert)) [d.l.]")+
   scale_size(range = c(0.1,3))+
-  scale_colour_viridis_c(direction = -1, option = "A", begin = 0.1, end = 0.9)+
+  scale_colour_viridis_c(direction = 1, option = "A", begin = 0.1, end = 0.9)+
   theme_article()
 
 p_expert_vs_blind_CH4tot <- ggpubr::ggarrange(p1, p2, nrow = 1, common.legend = T, legend = "right")
+p_expert_vs_blind_CH4tot
 ggsave(plot = p_expert_vs_blind_CH4tot, filename = "expert_vs_blind_CH4tot.jpeg", path = plots_path, 
-       width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+       width = 8, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+
+p1 <- p1 + geom_point(aes(colour = ebull_contrib, size = ebull_contrib))
+p2 <- p2 + geom_point(aes(colour = ebull_contrib, size = ebull_contrib))
+p_expert_vs_blind_CH4tot <- ggpubr::ggarrange(p1, p2, nrow = 1, common.legend = T, legend = "right")
+p_expert_vs_blind_CH4tot
+ggsave(plot = p_expert_vs_blind_CH4tot, filename = "expert_vs_blind_CH4tot_ebullContrib.jpeg", path = plots_path, 
+       width = 8, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
 
 
 # plot incubations with the highest disagreements between experts
@@ -751,7 +2072,7 @@ table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_ch4-(table_draws_s
 
 p_disagree_CH4tot <- ggplot()+
   geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
-                                              ymin = -Inf, ymax = Inf, fill=userID), 
+                                        ymin = -Inf, ymax = Inf, fill=userID), 
             # fill="grey50", 
             alpha=0.2)+
   geom_path(data = mydata_sel, aes(as.numeric(Etime), CH4dry_ppb, group = UniqueID))+
@@ -789,25 +2110,13 @@ ggsave(plot = p_exceed, filename = "overview_expert_vs_blind_ch4_diffusion.jpg",
 
 
 
-p1 <- ggplot(df_multiple_users_CH4, aes(diffusion_blind, diffusion_users_mean, colour = n))+
-  scale_x_log10()+
-  scale_y_log10()+
-  geom_abline(slope = 1, intercept = 0)+
-  geom_point(aes(size = ebull_contrib))+
-  geom_errorbar(aes(ymin=diffusion_users_mean-diffusion_users_sd, 
-                    ymax=diffusion_users_mean+diffusion_users_sd))+
-  xlab("Blind (ch4 diffusion)")+
-  ylab("Expert (ch4 diffusion)")+
-  scale_size(range = c(0.1,3))+
-  scale_colour_viridis_c(direction = -1, option = "A", begin = 0.1, end = 0.9)+
-  theme_article()
 
 
 p2 <- ggplot(df_multiple_users_CH4, 
-             aes(diffusion_abs_diff, abs(diffusion_users_CV), colour = n, size = ebull_contrib))+geom_point()+
+             aes(diffusion_abs_diff, abs(diffusion_users_CV)))+geom_point()+
   scale_x_log10()+
   scale_y_log10()+
-  xlab("abs((Blind - mean(Expert)) [ch4 flux]")+
+  xlab("abs((Automated - mean(Expert)) [nmol m-2 s-1]")+
   ylab("abs(CV(Expert)) [d.l.]")+
   scale_size(range = c(0.1,3))+
   scale_colour_viridis_c(direction = -1, option = "A", begin = 0.1, end = 0.9)+
@@ -815,7 +2124,16 @@ p2 <- ggplot(df_multiple_users_CH4,
 
 p_expert_vs_blind_CH4diff <- ggpubr::ggarrange(p1, p2, nrow = 1, common.legend = T, legend = "right")
 ggsave(plot = p_expert_vs_blind_CH4diff, filename = "expert_vs_blind_CH4diff.jpeg", path = plots_path, 
-       width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+       width = 8, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+
+
+p1 <- p1 + geom_point(aes(colour = ebull_contrib, size = ebull_contrib))
+p2 <- p2 + geom_point(aes(colour = ebull_contrib, size = ebull_contrib))
+p_expert_vs_blind_CH4diff <- ggpubr::ggarrange(p1, p2, nrow = 1, common.legend = T, legend = "right")
+p_expert_vs_blind_CH4diff
+ggsave(plot = p_expert_vs_blind_CH4diff, filename = "expert_vs_blind_CH4diff_ebullContrib.jpeg", path = plots_path, 
+       width = 8, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+
 
 
 # plot incubations with the highest disagreements between experts
@@ -830,7 +2148,7 @@ table_draws_sel[order(table_draws_sel$UniqueID),]
 
 p_disagree_CH4diff <- ggplot()+
   geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
-                                              ymin = -Inf, ymax = Inf, fill=userID), 
+                                        ymin = -Inf, ymax = Inf, fill=userID), 
             # fill="grey50", 
             alpha=0.2)+
   geom_path(data = mydata_sel, aes(as.numeric(Etime), CH4dry_ppb, group = UniqueID))+
@@ -846,8 +2164,8 @@ ggsave(plot = p_disagree_CH4diff, filename = "expert_choice_CH4diff.jpeg", path 
 # ---- Differences between experts EBULLITION CH4 ----
 
 
-flux_ref = CH4_flux.man$ebullition.flux
-flux_model = CH4_flux.auto$ebullition.flux[match(CH4_flux.man$UniqueID, CH4_flux.auto$UniqueID)]
+flux_ref = CH4_flux.man$ebullition.flux[CH4_flux.man$ebullition.flux>0]
+flux_model = CH4_flux.auto$ebullition.flux[match(CH4_flux.man$UniqueID[CH4_flux.man$ebullition.flux>0], CH4_flux.auto$UniqueID)]
 df_exceedance_CH4 <- get_df_exceedance(abs(flux_model - flux_ref)/flux_model*100)
 ind_closest_10 <- which.min(abs(df_exceedance_CH4$t-10))
 
@@ -873,24 +2191,12 @@ ggsave(plot = p_exceed, filename = "overview_expert_vs_blind_ch4_diffusion.jpg",
 ggplot(df_multiple_users_CH4, aes(ebull_contrib))+geom_density()+theme_article()
 
 
-df_ebull <- df_multiple_users_CH4[df_multiple_users_CH4$ebull_blind>0 & df_multiple_users_CH4$ebull_users_mean>0,]
-p1 <- ggplot(df_ebull, aes(ebull_blind, ebull_users_mean, colour = n))+
-  scale_x_log10()+
-  scale_y_log10()+
-  geom_abline(slope = 1, intercept = 0)+
-  geom_point(aes(size = ebull_contrib))+
-  geom_errorbar(aes(ymin=ebull_users_mean-ebull_users_sd, 
-                    ymax=ebull_users_mean+ebull_users_sd))+
-  xlab("Blind (ch4 ebullition)")+
-  ylab("Expert (ch4 ebullition)")+
-  scale_size(range = c(0.1,3))+
-  scale_colour_viridis_c(direction = -1, option = "A", begin = 0.1, end = 0.9)+
-  theme_article()
 
-p2 <- ggplot(df_ebull, aes(ebull_abs_diff, abs(ebull_users_CV), colour = n, size = ebull_contrib))+geom_point()+
+
+p2 <- ggplot(df_ebull, aes(ebull_abs_diff, abs(ebull_users_CV)))+geom_point()+
   scale_x_log10()+
   scale_y_log10()+
-  xlab("abs((Blind - mean(Expert)) [ch4 flux]")+
+  xlab("abs((Automated - mean(Expert)) [nmol m-2 s-1]")+
   ylab("abs(CV(Expert)) [d.l.]")+
   scale_size(range = c(0.1,3))+
   scale_colour_viridis_c(direction = -1, option = "A", begin = 0.1, end = 0.9)+
@@ -899,8 +2205,14 @@ p2 <- ggplot(df_ebull, aes(ebull_abs_diff, abs(ebull_users_CV), colour = n, size
 
 p_expert_vs_blind_CH4ebull <- ggpubr::ggarrange(p1, p2, nrow = 1, common.legend = T, legend = "right")
 ggsave(plot = p_expert_vs_blind_CH4ebull, filename = "expert_vs_blind_CH4ebull.jpeg", path = plots_path, 
-       width = 6, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
+       width = 8, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
 
+p1 <- p1 + geom_point(aes(colour = ebull_contrib, size = ebull_contrib))
+p2 <- p2 + geom_point(aes(colour = ebull_contrib, size = ebull_contrib))
+p_expert_vs_blind_CH4ebull <- ggpubr::ggarrange(p1, p2, nrow = 1, common.legend = T, legend = "right")
+p_expert_vs_blind_CH4ebull
+ggsave(plot = p_expert_vs_blind_CH4ebull, filename = "expert_vs_blind_CH4ebull.jpeg_ebullContrib.jpeg", path = plots_path, 
+       width = 8, height = 3.2, dpi = 300, units = 'in', scale = 1.0)
 
 
 # plot incubations with the highest disagreements
@@ -914,7 +2226,7 @@ table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_ch4-(table_draws_s
 
 p_disagree_CH4ebull <- ggplot()+
   geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
-                                              ymin = -Inf, ymax = Inf, fill= userID), 
+                                        ymin = -Inf, ymax = Inf, fill= userID), 
             # fill="grey50", 
             alpha=0.2)+
   geom_path(data = mydata_sel, aes(as.numeric(Etime), CH4dry_ppb, group = UniqueID))+
@@ -936,7 +2248,7 @@ table_draws_sel$Etime_stop <- table_draws_sel$end.time_expert_ch4-(table_draws_s
 
 ggplot()+
   geom_rect(data = table_draws_sel, aes(xmin = Etime_start, xmax = Etime_stop, 
-                                              ymin = -Inf, ymax = Inf, fill = username), 
+                                        ymin = -Inf, ymax = Inf, fill = username), 
             # fill="grey50", 
             alpha=0.2)+
   geom_path(data = mydata_sel, aes(as.numeric(Etime), CH4dry_ppb, group = UniqueID))+
@@ -1035,7 +2347,7 @@ p_exceed <- ggplot(df_exceedance_CH4, aes(t, p))+geom_path()+geom_point()+
 p_exceed
 
 p_goflux_vs_deltaC <- ggplot(CH4_flux.auto[CH4_flux.auto$ebullition.contrib >=0 & CH4_flux.auto$ebullition.contrib <= 1,], 
-       aes(best.flux, total.flux, size = ebullition.contrib))+geom_point()+
+                             aes(best.flux, total.flux, size = ebullition.contrib))+geom_point()+
   scale_x_log10()+
   scale_y_log10()+
   scale_size(range = c(0.1,3))+
@@ -1060,19 +2372,17 @@ require(ggnewscale)
 
 auxfile$obs.length <- auxfile$duration
 
-list_ids <- head(df_multiple_users_CH4$id[order(df_multiple_users_CH4$ebull_contrib)], 9)
+list_ids <- tail(df_multiple_users_CH4$id[order(df_multiple_users_CH4$ebull_contrib)], 9)
 
-for(i in seq_along(list_ids)){
-  mydata_sel <- load_this(mylist = list_ids[i])
-  # print(plot_incubations(mydata_sel))
-  
-  automaticflux(dataframe = mydata_sel, myauxfile = auxfile, shoulder = 0, 
-                gastype = "CH4dry_ppb", fluxSeparation = T, displayPlots = T, method = "trust.it.all")
-  
-}
+mydata_sel <- load_this(mylist = list_ids)
+# print(plot_incubations(mydata_sel))
+
+automaticflux(dataframe = mydata_sel, myauxfile = auxfile, shoulder = 0, 
+              gastype = "CH4dry_ppb", fluxSeparation = T, displayPlots = T, method = "trust.it.all")
+
 
 clickflux(dataframe = mydata_sel, myauxfile = auxfile, shoulder = 0, 
-              gastype = "CH4dry_ppb", fluxSeparation = F, displayPlots = T, plot.lim = c(2000, max(mydata_sel$CH4dry_ppb)))
+          gastype = "CH4dry_ppb", fluxSeparation = T, displayPlots = T, plot.lim = c(2000, max(mydata_sel$CH4dry_ppb)))
 
 
 
@@ -1192,7 +2502,7 @@ ggplot(stats_all_sel, aes(ebull_ch4, sd_ch4))+
   geom_smooth(method = "lm")+
   scale_x_log10()+
   scale_y_log10()+
-    theme_article()
+  theme_article()
 
 
 ggplot(stats_all, aes(ebull_ch4, sd_ch4))+

@@ -28,7 +28,7 @@ dropbox_root <- "C:/Users/Camille Minaudo/Dropbox/RESTORE4Cs - Fieldwork/Data"
 
 #---------------------------------------------------------#
 # set the number of incubations you want to work on in this session.
-nb_draw <- 10 # change this as you please, but not below 2. A value of 10 is a good compromise.
+nb_draw <- 2 # change this as you please, but not below 2. A value of 10 is a good compromise.
 
 
 # When happy with your Settings, do Alt + Ctr + R to run the whole script at once.
@@ -65,7 +65,7 @@ nb_draw <- 10 # change this as you please, but not below 2. A value of 10 is a g
   loggerspath <- paste0(datapath,"/RAW Data Logger")
   RData_path <- paste0(dropbox_root,"/GHG/Processed data/RData/")
   plots_path <- paste0(dropbox_root,"/GHG/GHG_expert_vs_automated/plots/")
-  results_path <- paste0(dropbox_root,"/GHG/GHG_expert_vs_automated/results/")
+  results_path <- "C:/Users/Camille Minaudo/OneDrive - Universitat de Barcelona/Documentos/PROJECTS/RESTORE4Cs/GHG_expert_vs_automated/results"
   
   # loading auxfile
   setwd(dirname(results_path))
@@ -117,6 +117,8 @@ nb_draw <- 10 # change this as you please, but not below 2. A value of 10 is a g
     stop("Please provide your username")
   }
   
+  # draw = which(auxfile$UniqueID == "s3-va-a1-4-o-d-10:04")
+  # draw = which(auxfile$UniqueID == "s1-cu-a2-16-o-d-11:58")
   
   table_draw <- data.frame(username = username,
                            draw = draw,
